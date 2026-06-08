@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="RhFolha.Api/RhFolha.Api.csproj" />
+  <Project Path="RhFolha.Application/RhFolha.Application.csproj" />
+  <Project Path="RhFolha.Domain/RhFolha.Domain.csproj" />
+  <Project Path="RhFolha.Infrastructure/RhFolha.Infrastructure.csproj" />
+  <Project Path="RhFolha.Tests/RhFolha.Tests.csproj" />
+</Solution>
