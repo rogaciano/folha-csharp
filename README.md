@@ -58,6 +58,7 @@ GET /api/health
 - Especificacao funcional: [`docs/specs-rh-folha.md`](docs/specs-rh-folha.md)
 - Plano de implementacao: [`docs/plano-implementacao.md`](docs/plano-implementacao.md)
 - Deploy em VPS sem Docker: [`deploy/vps/README.md`](deploy/vps/README.md)
+- Pos-mortem do primeiro deploy: [`docs/pos-mortem-deploy-vps.md`](docs/pos-mortem-deploy-vps.md)
 
 Criar migration:
 

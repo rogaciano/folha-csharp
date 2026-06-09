@@ -2,7 +2,7 @@
 set -euo pipefail
 
 BACKUP_DIR="${BACKUP_DIR:-/opt/rh-folha/backups}"
-UPLOADS_DIR="${UPLOADS_DIR:-/opt/rh-folha/data/uploads}"
+UPLOADS_DIR="${UPLOADS_DIR:-/opt/rh-folha/publish/api/data/uploads}"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 
 mkdir -p "$BACKUP_DIR"
