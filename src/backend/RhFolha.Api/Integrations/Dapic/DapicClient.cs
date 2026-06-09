@@ -112,10 +112,10 @@ public sealed class DapicClient(HttpClient httpClient)
         DateOnly? endDate,
         CancellationToken cancellationToken)
     {
-        var path = $"/v1/ordensproducao?Pagina={page}&RegistrosPorPagina={pageSize}&DataInicial={startDate:yyyy-MM-dd}";
+        var path = $"/v1/ordensproducao?Pagina={page}&RegistrosPorPagina={pageSize}&DataInicial={FormatDapicDate(startDate)}";
         if (endDate.HasValue)
         {
-            path += $"&DataFinal={endDate.Value:yyyy-MM-dd}";
+            path += $"&DataFinal={FormatDapicDate(endDate.Value)}";
         }
 
         return GetPagedAsync<DapicProductionOrderDto>(baseUrl, accessToken, path, cancellationToken);
@@ -172,6 +172,11 @@ public sealed class DapicClient(HttpClient httpClient)
             : baseUrl.Trim().TrimEnd('/');
 
         return new Uri($"{normalizedBaseUrl}{path}");
+    }
+
+    private static string FormatDapicDate(DateOnly value)
+    {
+        return Uri.EscapeDataString(value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture));
     }
 
     private static string? ReadString(JsonElement element, string propertyName)
