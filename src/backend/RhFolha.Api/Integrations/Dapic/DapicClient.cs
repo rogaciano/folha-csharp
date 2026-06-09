@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace RhFolha.Api.Integrations.Dapic;
 
@@ -10,6 +11,11 @@ public sealed class DapicClient(HttpClient httpClient)
     {
         PropertyNameCaseInsensitive = true
     };
+
+    static DapicClient()
+    {
+        JsonOptions.Converters.Add(new FlexibleIntJsonConverter());
+    }
 
     public async Task<DapicTokenResult> LoginAsync(
         string baseUrl,
@@ -170,6 +176,29 @@ public sealed class DapicClient(HttpClient httpClient)
 }
 
 public sealed class DapicClientException(string message) : Exception(message);
+
+internal sealed class FlexibleIntJsonConverter : JsonConverter<int>
+{
+    public override int Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Number && reader.TryGetInt32(out var numberValue))
+        {
+            return numberValue;
+        }
+
+        if (reader.TokenType == JsonTokenType.String && int.TryParse(reader.GetString(), out var stringValue))
+        {
+            return stringValue;
+        }
+
+        throw new JsonException("Valor inteiro invalido retornado pela Dapic.");
+    }
+
+    public override void Write(Utf8JsonWriter writer, int value, JsonSerializerOptions options)
+    {
+        writer.WriteNumberValue(value);
+    }
+}
 
 public sealed record DapicTokenResult(string AccessToken, DateTime ExpiresAt);
 
