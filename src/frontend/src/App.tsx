@@ -4529,6 +4529,17 @@ function DapicConferencePanel({
         </label>
       </div>
 
+      <PaginationControls
+        page={safePage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalRecords={filtered.length}
+        onFirst={() => setPage(1)}
+        onPrevious={() => setPage((currentPage) => Math.max(currentPage - 1, 1))}
+        onNext={() => setPage((currentPage) => Math.min(currentPage + 1, totalPages))}
+        onLast={() => setPage(totalPages)}
+      />
+
       <div className="table-scroll">
         <table>
           <thead>
@@ -4555,40 +4566,18 @@ function DapicConferencePanel({
         </table>
       </div>
 
-      <div className="pagination-bar">
-        <span>
-          Pagina {safePage} de {totalPages} | {pageSize} registro(s) por pagina
-        </span>
-        <div className="pagination-actions">
-          <button type="button" className="secondary-button" disabled={safePage === 1} onClick={() => setPage(1)}>
-            Primeira
-          </button>
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={safePage === 1}
-            onClick={() => setPage((currentPage) => Math.max(currentPage - 1, 1))}
-          >
-            Anterior
-          </button>
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={safePage === totalPages}
-            onClick={() => setPage((currentPage) => Math.min(currentPage + 1, totalPages))}
-          >
-            Proxima
-          </button>
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={safePage === totalPages}
-            onClick={() => setPage(totalPages)}
-          >
-            Ultima
-          </button>
-        </div>
-      </div>
+      {totalPages > 1 && (
+        <PaginationControls
+          page={safePage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalRecords={filtered.length}
+          onFirst={() => setPage(1)}
+          onPrevious={() => setPage((currentPage) => Math.max(currentPage - 1, 1))}
+          onNext={() => setPage((currentPage) => Math.min(currentPage + 1, totalPages))}
+          onLast={() => setPage(totalPages)}
+        />
+      )}
     </section>
   )
 }
