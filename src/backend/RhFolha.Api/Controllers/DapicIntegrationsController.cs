@@ -197,6 +197,7 @@ public sealed class DapicIntegrationsController(
     {
         var employees = await dbContext.DapicEmployees
             .AsNoTracking()
+            .Include(employee => employee.Employee)
             .OrderBy(employee => employee.Name)
             .Select(employee => new DapicEmployeeResponse(
                 employee.Id,
@@ -207,10 +208,86 @@ public sealed class DapicIntegrationsController(
                 employee.DisplayName,
                 employee.Status,
                 employee.IsIgnored,
+                employee.LinkStatus,
+                employee.EmployeeId,
+                employee.Employee != null ? employee.Employee.Registration : null,
+                employee.Employee != null ? employee.Employee.Name : null,
+                employee.LinkedAt,
+                employee.IgnoredAt,
+                employee.IgnoredReason,
                 employee.LastSyncedAt))
             .ToListAsync(cancellationToken);
 
         return Ok(employees);
+    }
+
+    [HttpPost("employees/{id:guid}/link")]
+    public async Task<IActionResult> LinkEmployee(Guid id, LinkDapicEmployeeRequest request, CancellationToken cancellationToken)
+    {
+        var dapicEmployee = await dbContext.DapicEmployees.FirstOrDefaultAsync(employee => employee.Id == id, cancellationToken);
+
+        if (dapicEmployee is null)
+        {
+            return NotFound();
+        }
+
+        var employee = await dbContext.Employees.FirstOrDefaultAsync(
+            item => item.Id == request.EmployeeId && item.CompanyId == dapicEmployee.CompanyId,
+            cancellationToken);
+
+        if (employee is null)
+        {
+            return BadRequest(new { message = "Colaborador informado nao encontrado na mesma empresa." });
+        }
+
+        var alreadyLinked = await dbContext.DapicEmployees.AnyAsync(
+            item => item.Id != dapicEmployee.Id && item.CompanyId == dapicEmployee.CompanyId && item.EmployeeId == employee.Id,
+            cancellationToken);
+
+        if (alreadyLinked)
+        {
+            return BadRequest(new { message = "Este colaborador ja esta vinculado a outro funcionario Dapic." });
+        }
+
+        dapicEmployee.LinkToEmployee(employee.Id);
+        auditService.Add("dapic.employee_link", "DapicEmployee", dapicEmployee.Id, $"Funcionario Dapic {dapicEmployee.Name} vinculado ao colaborador {employee.Name}.");
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    [HttpPost("employees/{id:guid}/ignore")]
+    public async Task<IActionResult> IgnoreEmployee(Guid id, IgnoreDapicEmployeeRequest request, CancellationToken cancellationToken)
+    {
+        var dapicEmployee = await dbContext.DapicEmployees.FirstOrDefaultAsync(employee => employee.Id == id, cancellationToken);
+
+        if (dapicEmployee is null)
+        {
+            return NotFound();
+        }
+
+        dapicEmployee.Ignore(request.Reason);
+        auditService.Add("dapic.employee_ignore", "DapicEmployee", dapicEmployee.Id, $"Funcionario Dapic {dapicEmployee.Name} marcado como ignorado.");
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    [HttpPost("employees/{id:guid}/reset-link")]
+    public async Task<IActionResult> ResetEmployeeLink(Guid id, CancellationToken cancellationToken)
+    {
+        var dapicEmployee = await dbContext.DapicEmployees.FirstOrDefaultAsync(employee => employee.Id == id, cancellationToken);
+
+        if (dapicEmployee is null)
+        {
+            return NotFound();
+        }
+
+        dapicEmployee.ResetLink();
+        auditService.Add("dapic.employee_reset_link", "DapicEmployee", dapicEmployee.Id, $"Vinculo do funcionario Dapic {dapicEmployee.Name} removido.");
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
     }
 
     [HttpGet("products")]
@@ -315,6 +392,8 @@ public sealed record ConfigureDapicIntegrationRequest(
     string IntegrationToken);
 
 public sealed record SyncDapicResourceRequest(DateOnly? DataInicial, DateOnly? DataFinal);
+public sealed record LinkDapicEmployeeRequest(Guid EmployeeId);
+public sealed record IgnoreDapicEmployeeRequest(string? Reason);
 
 public sealed record DapicIntegrationResponse(
     Guid Id,
@@ -349,6 +428,13 @@ public sealed record DapicEmployeeResponse(
     string? DisplayName,
     string Status,
     bool IsIgnored,
+    string LinkStatus,
+    Guid? EmployeeId,
+    string? EmployeeRegistration,
+    string? EmployeeName,
+    DateTime? LinkedAt,
+    DateTime? IgnoredAt,
+    string? IgnoredReason,
     DateTime LastSyncedAt);
 
 public sealed record DapicProductResponse(

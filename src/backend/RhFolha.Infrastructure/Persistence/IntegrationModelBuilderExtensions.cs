@@ -113,6 +113,7 @@ internal static class IntegrationModelBuilderExtensions
             entity.HasKey(employee => employee.Id);
             entity.Property(employee => employee.Id).HasColumnName("id");
             entity.Property(employee => employee.CompanyId).HasColumnName("company_id").IsRequired();
+            entity.Property(employee => employee.EmployeeId).HasColumnName("employee_id");
             entity.Property(employee => employee.ExternalId).HasColumnName("external_id").HasMaxLength(80).IsRequired();
             entity.Property(employee => employee.Name).HasColumnName("name").HasMaxLength(180).IsRequired();
             entity.Property(employee => employee.FantasyName).HasColumnName("fantasy_name").HasMaxLength(180);
@@ -121,6 +122,10 @@ internal static class IntegrationModelBuilderExtensions
             entity.Property(employee => employee.RawUpdatedAt).HasColumnName("raw_updated_at");
             entity.Property(employee => employee.LastSyncedAt).HasColumnName("last_synced_at").IsRequired();
             entity.Property(employee => employee.IsIgnored).HasColumnName("is_ignored").IsRequired();
+            entity.Property(employee => employee.LinkStatus).HasColumnName("link_status").HasMaxLength(30).IsRequired();
+            entity.Property(employee => employee.LinkedAt).HasColumnName("linked_at");
+            entity.Property(employee => employee.IgnoredAt).HasColumnName("ignored_at");
+            entity.Property(employee => employee.IgnoredReason).HasColumnName("ignored_reason").HasMaxLength(500);
             entity.Property(employee => employee.DeletedAt).HasColumnName("deleted_at");
             entity.Property(employee => employee.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(employee => employee.UpdatedAt).HasColumnName("updated_at");
@@ -128,8 +133,14 @@ internal static class IntegrationModelBuilderExtensions
                 .WithMany()
                 .HasForeignKey(employee => employee.CompanyId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(employee => employee.Employee)
+                .WithMany()
+                .HasForeignKey(employee => employee.EmployeeId)
+                .OnDelete(DeleteBehavior.SetNull);
             entity.HasIndex(employee => new { employee.CompanyId, employee.ExternalId }).IsUnique();
             entity.HasIndex(employee => new { employee.CompanyId, employee.Name });
+            entity.HasIndex(employee => new { employee.CompanyId, employee.EmployeeId });
+            entity.HasIndex(employee => new { employee.CompanyId, employee.LinkStatus });
         });
     }
 }

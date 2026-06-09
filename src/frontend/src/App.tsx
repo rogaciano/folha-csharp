@@ -335,6 +335,13 @@ type DapicEmployee = {
   displayName: string | null
   status: string
   isIgnored: boolean
+  linkStatus: string
+  employeeId: string | null
+  employeeRegistration: string | null
+  employeeName: string | null
+  linkedAt: string | null
+  ignoredAt: string | null
+  ignoredReason: string | null
   lastSyncedAt: string
 }
 
@@ -1300,6 +1307,37 @@ function App() {
     }
   }
 
+  async function handleDapicEmployeeLink(dapicEmployee: DapicEmployee, employeeId: string) {
+    try {
+      await postData(`/integrations/dapic/employees/${dapicEmployee.id}/link`, { employeeId })
+      showMessage('Funcionario Dapic vinculado ao colaborador.')
+      setMessageModal('Funcionario Dapic vinculado ao colaborador com sucesso.')
+    } catch {
+      showMessage('Nao foi possivel vincular o funcionario Dapic.')
+    }
+  }
+
+  async function handleDapicEmployeeIgnore(dapicEmployee: DapicEmployee) {
+    const reason = window.prompt('Informe o motivo para ignorar este funcionario Dapic:', 'Nao utilizado na folha')
+    if (reason === null) return
+
+    try {
+      await postData(`/integrations/dapic/employees/${dapicEmployee.id}/ignore`, { reason })
+      showMessage('Funcionario Dapic marcado como ignorado.')
+    } catch {
+      showMessage('Nao foi possivel ignorar o funcionario Dapic.')
+    }
+  }
+
+  async function handleDapicEmployeeReset(dapicEmployee: DapicEmployee) {
+    try {
+      await postAction(`/integrations/dapic/employees/${dapicEmployee.id}/reset-link`)
+      showMessage('Situacao do funcionario Dapic redefinida.')
+    } catch {
+      showMessage('Nao foi possivel redefinir o funcionario Dapic.')
+    }
+  }
+
   if (!session) {
     return <LoginView message={loginMessage} onSubmit={handleLoginSubmit} />
   }
@@ -1485,6 +1523,7 @@ function App() {
             statutoryTables={statutoryTables}
             users={systemUsers}
             auditLogs={auditLogs}
+            hrEmployees={employees}
             dapicIntegrations={dapicIntegrations}
             dapicLogs={dapicLogs}
             dapicEmployees={dapicEmployees}
@@ -1506,6 +1545,9 @@ function App() {
             onDapicConfigure={handleDapicConfigure}
             onDapicTest={handleDapicTest}
             onDapicSync={handleDapicSync}
+            onDapicEmployeeLink={handleDapicEmployeeLink}
+            onDapicEmployeeIgnore={handleDapicEmployeeIgnore}
+            onDapicEmployeeReset={handleDapicEmployeeReset}
             onDapicOrderStartDateChange={setDapicOrderStartDate}
             onDapicOrderEndDateChange={setDapicOrderEndDate}
           />
@@ -4000,6 +4042,7 @@ function SettingsView({
   statutoryTables,
   users,
   auditLogs,
+  hrEmployees,
   dapicIntegrations,
   dapicLogs,
   dapicEmployees,
@@ -4021,6 +4064,9 @@ function SettingsView({
   onDapicConfigure,
   onDapicTest,
   onDapicSync,
+  onDapicEmployeeLink,
+  onDapicEmployeeIgnore,
+  onDapicEmployeeReset,
   onDapicOrderStartDateChange,
   onDapicOrderEndDateChange,
 }: {
@@ -4029,6 +4075,7 @@ function SettingsView({
   statutoryTables: StatutoryTable[]
   users: SystemUser[]
   auditLogs: AuditLog[]
+  hrEmployees: Employee[]
   dapicIntegrations: DapicIntegration[]
   dapicLogs: DapicSyncLog[]
   dapicEmployees: DapicEmployee[]
@@ -4050,6 +4097,9 @@ function SettingsView({
   onDapicConfigure: (event: FormEvent<HTMLFormElement>) => void
   onDapicTest: (integration: DapicIntegration) => void
   onDapicSync: (integration: DapicIntegration, resource: string) => void
+  onDapicEmployeeLink: (dapicEmployee: DapicEmployee, employeeId: string) => void
+  onDapicEmployeeIgnore: (dapicEmployee: DapicEmployee) => void
+  onDapicEmployeeReset: (dapicEmployee: DapicEmployee) => void
   onDapicOrderStartDateChange: (value: string) => void
   onDapicOrderEndDateChange: (value: string) => void
 }) {
@@ -4216,7 +4266,8 @@ function SettingsView({
         activeTab={dapicConferenceTab}
         search={dapicConferenceSearch}
         status={dapicConferenceStatus}
-        employees={dapicEmployees}
+        employees={hrEmployees}
+        dapicEmployees={dapicEmployees}
         products={dapicProducts}
         operations={dapicOperations}
         cells={dapicCells}
@@ -4224,6 +4275,9 @@ function SettingsView({
         onTabChange={setDapicConferenceTab}
         onSearchChange={setDapicConferenceSearch}
         onStatusChange={setDapicConferenceStatus}
+        onEmployeeLink={onDapicEmployeeLink}
+        onEmployeeIgnore={onDapicEmployeeIgnore}
+        onEmployeeReset={onDapicEmployeeReset}
       />
 
       <DataTable
@@ -4424,6 +4478,7 @@ function DapicConferencePanel({
   search,
   status,
   employees,
+  dapicEmployees,
   products,
   operations,
   cells,
@@ -4431,11 +4486,15 @@ function DapicConferencePanel({
   onTabChange,
   onSearchChange,
   onStatusChange,
+  onEmployeeLink,
+  onEmployeeIgnore,
+  onEmployeeReset,
 }: {
   activeTab: DapicConferenceTab
   search: string
   status: string
-  employees: DapicEmployee[]
+  employees: Employee[]
+  dapicEmployees: DapicEmployee[]
   products: DapicProduct[]
   operations: DapicNamedProduction[]
   cells: DapicNamedProduction[]
@@ -4443,17 +4502,25 @@ function DapicConferencePanel({
   onTabChange: (tab: DapicConferenceTab) => void
   onSearchChange: (value: string) => void
   onStatusChange: (value: string) => void
+  onEmployeeLink: (dapicEmployee: DapicEmployee, employeeId: string) => void
+  onEmployeeIgnore: (dapicEmployee: DapicEmployee) => void
+  onEmployeeReset: (dapicEmployee: DapicEmployee) => void
 }) {
   const [page, setPage] = useState(1)
+  const [linkingEmployee, setLinkingEmployee] = useState<DapicEmployee | null>(null)
   const pageSize = 15
   const tabs: Array<{ id: DapicConferenceTab; label: string; count: number }> = [
-    { id: 'employees', label: 'Funcionarios', count: employees.length },
+    { id: 'employees', label: 'Funcionarios', count: dapicEmployees.length },
     { id: 'products', label: 'Produtos', count: products.length },
     { id: 'operations', label: 'Operacoes', count: operations.length },
     { id: 'cells', label: 'Celulas', count: cells.length },
     { id: 'orders', label: 'Ordens', count: orders.length },
   ]
-  const current = buildDapicConferenceRows(activeTab, { employees, products, operations, cells, orders })
+  const current = buildDapicConferenceRows(
+    activeTab,
+    { employees: dapicEmployees, products, operations, cells, orders },
+    { onEmployeeLink: setLinkingEmployee, onEmployeeIgnore, onEmployeeReset },
+  )
   const statuses = Array.from(new Set(current.records.map((record) => record.status).filter(Boolean))).sort((left, right) =>
     labelDapicStatus(left).localeCompare(labelDapicStatus(right), 'pt-BR'),
   )
@@ -4522,7 +4589,7 @@ function DapicConferencePanel({
             <option value="all">Todos</option>
             {statuses.map((statusOption) => (
               <option key={statusOption} value={statusOption}>
-                {labelDapicStatus(statusOption)}
+                {activeTab === 'employees' ? labelDapicLinkStatus(statusOption) : labelDapicStatus(statusOption)}
               </option>
             ))}
           </select>
@@ -4578,6 +4645,20 @@ function DapicConferencePanel({
           onLast={() => setPage(totalPages)}
         />
       )}
+
+      {linkingEmployee && (
+        <Modal title="Vincular funcionario Dapic" onClose={() => setLinkingEmployee(null)}>
+          <DapicEmployeeLinkForm
+            dapicEmployee={linkingEmployee}
+            employees={employees}
+            onCancel={() => setLinkingEmployee(null)}
+            onSubmit={(employeeId) => {
+              onEmployeeLink(linkingEmployee, employeeId)
+              setLinkingEmployee(null)
+            }}
+          />
+        </Modal>
+      )}
     </section>
   )
 }
@@ -4591,21 +4672,38 @@ function buildDapicConferenceRows(
     cells: DapicNamedProduction[]
     orders: DapicProductionOrder[]
   },
+  actions: {
+    onEmployeeLink: (employee: DapicEmployee) => void
+    onEmployeeIgnore: (employee: DapicEmployee) => void
+    onEmployeeReset: (employee: DapicEmployee) => void
+  },
 ) {
   if (tab === 'employees') {
     return {
-      columns: ['Origem', 'Nome', 'Fantasia', 'Exibicao', 'Status', 'Ultima sincronizacao'],
+      columns: ['Origem', 'Nome', 'Fantasia', 'Exibicao', 'Situacao', 'Colaborador vinculado', 'Status', 'Ultima sincronizacao', 'Acoes'],
       records: data.employees.map((employee) => ({
         key: employee.id,
-        status: employee.status,
-        searchText: [employee.externalId, employee.name, employee.fantasyName, employee.displayName, employee.status].join(' '),
+        status: employee.linkStatus,
+        searchText: [
+          employee.externalId,
+          employee.name,
+          employee.fantasyName,
+          employee.displayName,
+          employee.status,
+          employee.linkStatus,
+          employee.employeeRegistration,
+          employee.employeeName,
+        ].join(' '),
         cells: [
           originBadge('dapic'),
           employee.name,
           employee.fantasyName ?? '-',
           employee.displayName ?? '-',
+          dapicLinkStatusBadge(employee.linkStatus),
+          employee.employeeName ? `${employee.employeeRegistration ?? '-'} - ${employee.employeeName}` : '-',
           dapicStatusBadge(employee.status),
           formatDateTime(employee.lastSyncedAt),
+          dapicEmployeeActions(employee, actions.onEmployeeLink, actions.onEmployeeIgnore, actions.onEmployeeReset),
         ],
       })),
     }
@@ -4683,6 +4781,68 @@ function buildDapicConferenceRows(
       ],
     })),
   }
+}
+
+function dapicEmployeeActions(
+  employee: DapicEmployee,
+  onLink: (employee: DapicEmployee) => void,
+  onIgnore: (employee: DapicEmployee) => void,
+  onReset: (employee: DapicEmployee) => void,
+) {
+  return (
+    <div className="table-actions">
+      {actionButton(employee.linkStatus === 'vinculado' ? 'Alterar vinculo' : 'Vincular', () => onLink(employee))}
+      {employee.linkStatus !== 'ignorado' && actionButton('Ignorar', () => onIgnore(employee))}
+      {employee.linkStatus !== 'pendente' && actionButton('Redefinir', () => onReset(employee))}
+    </div>
+  )
+}
+
+function DapicEmployeeLinkForm({
+  dapicEmployee,
+  employees,
+  onSubmit,
+  onCancel,
+}: {
+  dapicEmployee: DapicEmployee
+  employees: Employee[]
+  onSubmit: (employeeId: string) => void
+  onCancel: () => void
+}) {
+  return (
+    <form
+      className="entry-form"
+      onSubmit={(event) => {
+        event.preventDefault()
+        const data = new FormData(event.currentTarget)
+        onSubmit(String(data.get('employeeId')))
+      }}
+    >
+      <label className="span-2">
+        Funcionario Dapic
+        <input value={dapicEmployee.name} disabled />
+      </label>
+      <label className="span-2">
+        Colaborador RH Folha
+        <select name="employeeId" defaultValue={dapicEmployee.employeeId ?? selectDefaultValue(employees)} required>
+          {employees.length !== 1 && <option value="">Selecione o colaborador</option>}
+          {employees.map((employee) => (
+            <option key={employee.id} value={employee.id}>
+              {employee.registration} - {employee.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="modal-actions">
+        <button type="button" onClick={onCancel}>
+          Cancelar
+        </button>
+        <button type="submit" disabled={employees.length === 0}>
+          Salvar vinculo
+        </button>
+      </div>
+    </form>
+  )
 }
 
 function FeedbackBanner({ message }: { message: FeedbackMessage }) {
@@ -5333,6 +5493,9 @@ function labelAuditAction(value: string) {
     'statutory_table.duplicate': 'Criou nova vigencia',
     'statutory_table.activate': 'Reativou tabela legal',
     'statutory_table.deactivate': 'Inativou tabela legal',
+    'dapic.employee_link': 'Vinculou funcionario Dapic',
+    'dapic.employee_ignore': 'Ignorou funcionario Dapic',
+    'dapic.employee_reset_link': 'Redefiniu funcionario Dapic',
   }
 
   return labels[value] ?? value
@@ -5477,6 +5640,16 @@ function labelDapicStatus(value: string) {
   return labels[value.toLowerCase()] ?? value
 }
 
+function labelDapicLinkStatus(value: string) {
+  const labels: Record<string, string> = {
+    pendente: 'Pendente',
+    vinculado: 'Vinculado',
+    ignorado: 'Ignorado',
+  }
+
+  return labels[value] ?? value
+}
+
 function formatStatutoryRanges(ranges: StatutoryTableRange[]) {
   if (ranges.length === 0) return '-'
 
@@ -5538,6 +5711,10 @@ function originBadge(origin: 'manual' | 'dapic') {
 function dapicStatusBadge(value: string) {
   const normalized = normalizeSearch(value).replaceAll(' ', '-')
   return <span className={`status-badge dapic-status dapic-status-${normalized}`}>{labelDapicStatus(value)}</span>
+}
+
+function dapicLinkStatusBadge(value: string) {
+  return <span className={`status-badge dapic-link-status dapic-link-${value}`}>{labelDapicLinkStatus(value)}</span>
 }
 
 function entryStatusBadge(value: string) {
