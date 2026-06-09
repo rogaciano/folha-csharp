@@ -569,6 +569,30 @@ th {
   gap: 16px;
 }
 
+.dapic-conference .table-scroll {
+  overflow-x: visible;
+}
+
+.dapic-conference table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.dapic-conference th,
+.dapic-conference td {
+  overflow-wrap: anywhere;
+  white-space: normal;
+  vertical-align: top;
+}
+
+.dapic-conference .table-actions {
+  align-items: flex-start;
+}
+
+.dapic-conference .table-action {
+  min-width: 92px;
+}
+
 .dapic-conference-header {
   display: flex;
   align-items: flex-start;

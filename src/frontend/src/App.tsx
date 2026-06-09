@@ -4680,7 +4680,7 @@ function buildDapicConferenceRows(
 ) {
   if (tab === 'employees') {
     return {
-      columns: ['Origem', 'Nome', 'Fantasia', 'Exibicao', 'Situacao', 'Colaborador vinculado', 'Status', 'Ultima sincronizacao', 'Acoes'],
+      columns: ['Origem', 'Nome', 'Acoes', 'Situacao', 'Colaborador vinculado', 'Fantasia', 'Exibicao', 'Status', 'Ultima sincronizacao'],
       records: data.employees.map((employee) => ({
         key: employee.id,
         status: employee.linkStatus,
@@ -4697,13 +4697,13 @@ function buildDapicConferenceRows(
         cells: [
           originBadge('dapic'),
           employee.name,
-          employee.fantasyName ?? '-',
-          employee.displayName ?? '-',
+          dapicEmployeeActions(employee, actions.onEmployeeLink, actions.onEmployeeIgnore, actions.onEmployeeReset),
           dapicLinkStatusBadge(employee.linkStatus),
           employee.employeeName ? `${employee.employeeRegistration ?? '-'} - ${employee.employeeName}` : '-',
+          employee.fantasyName ?? '-',
+          employee.displayName ?? '-',
           dapicStatusBadge(employee.status),
           formatDateTime(employee.lastSyncedAt),
-          dapicEmployeeActions(employee, actions.onEmployeeLink, actions.onEmployeeIgnore, actions.onEmployeeReset),
         ],
       })),
     }
