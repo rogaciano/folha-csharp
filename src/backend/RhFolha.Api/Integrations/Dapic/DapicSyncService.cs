@@ -67,10 +67,10 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
 
                 foreach (var item in items)
                 {
-                    var externalId = item.Id.ToString();
-                    var reference = FirstNotEmpty(ReadText(item.Referencia), ReadText(item.Nome), externalId);
-                    var description = FirstNotEmpty(ReadText(item.DescricaoFabrica), ReadText(item.Descricao), reference);
-                    var status = FirstNotEmpty(ReadText(item.Status), "Unknown");
+                    var externalId = Limit(item.Id.ToString(), 80);
+                    var reference = Limit(FirstNotEmpty(ReadText(item.Referencia), ReadText(item.Nome), externalId), 80);
+                    var description = Limit(FirstNotEmpty(ReadText(item.DescricaoFabrica), ReadText(item.Descricao), reference), 250);
+                    var status = Limit(FirstNotEmpty(ReadText(item.Status), "Unknown"), 30);
                     var createdAt = ReadDateTime(item.DataCadastro);
                     var updatedAt = ReadDateTime(item.DataModificacao);
 
@@ -138,10 +138,10 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
 
                 foreach (var item in items)
                 {
-                    var externalId = item.Id.ToString();
-                    var number = FirstNotEmpty(ReadText(item.Numero), ReadText(item.Codigo), ReadText(item.Lote), externalId);
-                    var description = FirstNotEmpty(ReadText(item.Descricao), ReadText(item.Observacao), number);
-                    var status = FirstNotEmpty(ReadText(item.Status), "Unknown");
+                    var externalId = Limit(item.Id.ToString(), 80);
+                    var number = Limit(FirstNotEmpty(ReadText(item.Numero), ReadText(item.Codigo), ReadText(item.Lote), externalId), 80);
+                    var description = Limit(FirstNotEmpty(ReadText(item.Descricao), ReadText(item.Observacao), number), 500);
+                    var status = Limit(FirstNotEmpty(ReadText(item.Status), "Unknown"), 80);
                     var issueDate = ToDateOnly(ReadDateTime(item.DataConta) ?? ReadDateTime(item.DataCadastro));
                     var startDate = ToDateOnly(ReadDateTime(item.DataInicio));
                     var endDate = ToDateOnly(ReadDateTime(item.DataFim) ?? ReadDateTime(item.DataFinalizacao) ?? ReadDateTime(item.DataPrevisao));
@@ -195,19 +195,20 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
 
                     foreach (var item in items)
                     {
-                        var externalId = item.Id.ToString();
-                        var name = FirstNotEmpty(item.Nome, item.Descricao, externalId);
-                        var status = string.IsNullOrWhiteSpace(item.Status) ? "Unknown" : item.Status;
+                        var externalId = Limit(item.Id.ToString(), 80);
+                        var name = Limit(FirstNotEmpty(item.Nome, item.Descricao, externalId), 160);
+                        var description = LimitOrNull(item.Descricao, 500);
+                        var status = Limit(FirstNotEmpty(item.Status, "Unknown"), 30);
 
                         if (existing.TryGetValue(externalId, out var operation))
                         {
-                            operation.UpdateFromSync(name, item.Descricao, status);
+                            operation.UpdateFromSync(name, description, status);
                             updated += 1;
                         }
                         else
                         {
                             var newOperation = new ProductionOperation(integration.CompanyId, externalId, name);
-                            newOperation.UpdateFromSync(name, item.Descricao, status);
+                            newOperation.UpdateFromSync(name, description, status);
                             dbContext.ProductionOperations.Add(newOperation);
                             created += 1;
                         }
@@ -221,19 +222,20 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
 
                     foreach (var item in items)
                     {
-                        var externalId = item.Id.ToString();
-                        var name = FirstNotEmpty(item.Nome, item.Descricao, externalId);
-                        var status = string.IsNullOrWhiteSpace(item.Status) ? "Unknown" : item.Status;
+                        var externalId = Limit(item.Id.ToString(), 80);
+                        var name = Limit(FirstNotEmpty(item.Nome, item.Descricao, externalId), 160);
+                        var description = LimitOrNull(item.Descricao, 500);
+                        var status = Limit(FirstNotEmpty(item.Status, "Unknown"), 30);
 
                         if (existing.TryGetValue(externalId, out var cell))
                         {
-                            cell.UpdateFromSync(name, item.Descricao, status);
+                            cell.UpdateFromSync(name, description, status);
                             updated += 1;
                         }
                         else
                         {
                             var newCell = new ProductionCell(integration.CompanyId, externalId, name);
-                            newCell.UpdateFromSync(name, item.Descricao, status);
+                            newCell.UpdateFromSync(name, description, status);
                             dbContext.ProductionCells.Add(newCell);
                             created += 1;
                         }
@@ -301,10 +303,12 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
         }
         catch (Exception exception)
         {
-            integration.MarkError(exception.Message);
-            log.Finish("Error", Math.Max(page - 1, 0), read, created, updated, 0, exception.Message);
+            var errorMessage = BuildErrorMessage(exception);
+            DetachPendingSyncEntities(log, integration);
+            integration.MarkError(errorMessage);
+            log.Finish("Error", Math.Max(page - 1, 0), read, created, updated, 0, errorMessage);
             await dbContext.SaveChangesAsync(cancellationToken);
-            throw;
+            throw new InvalidOperationException(errorMessage, exception);
         }
     }
 
@@ -332,6 +336,61 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
     }
 
+    private static string Limit(string value, int maxLength)
+    {
+        var normalized = value.Trim();
+        return normalized.Length <= maxLength ? normalized : normalized[..maxLength];
+    }
+
+    private static string? LimitOrNull(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return Limit(value, maxLength);
+    }
+
+    private void DetachPendingSyncEntities(ExternalSyncLog log, ExternalIntegration integration)
+    {
+        foreach (var entry in dbContext.ChangeTracker.Entries().ToList())
+        {
+            if (ReferenceEquals(entry.Entity, log) || ReferenceEquals(entry.Entity, integration))
+            {
+                continue;
+            }
+
+            if (entry.State is EntityState.Added or EntityState.Modified && IsSyncEntity(entry.Entity))
+            {
+                entry.State = EntityState.Detached;
+            }
+        }
+    }
+
+    private static bool IsSyncEntity(object entity)
+    {
+        return entity is DapicEmployee
+            or ProductionProduct
+            or ProductionOperation
+            or ProductionCell
+            or ProductionOrder
+            or ProductionOrderProduct;
+    }
+
+    private static string BuildErrorMessage(Exception exception)
+    {
+        var root = exception;
+        while (root.InnerException is not null)
+        {
+            root = root.InnerException;
+        }
+
+        return ReferenceEquals(root, exception)
+            ? exception.Message
+            : $"{exception.Message} Detalhe: {root.Message}";
+    }
+
     private static string? ReadText(JsonElement element)
     {
         return element.ValueKind switch
@@ -357,9 +416,9 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
             var cultures = new[] { new CultureInfo("pt-BR"), CultureInfo.InvariantCulture };
             foreach (var culture in cultures)
             {
-                if (DateTime.TryParse(value, culture, DateTimeStyles.AssumeLocal, out var parsed))
+                if (DateTime.TryParse(value, culture, DateTimeStyles.AllowWhiteSpaces, out var parsed))
                 {
-                    return parsed;
+                    return ToUtc(parsed);
                 }
             }
 
@@ -367,6 +426,16 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
         }
 
         return null;
+    }
+
+    private static DateTime ToUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
     }
 
     private static DateOnly? ToDateOnly(DateTime? value)

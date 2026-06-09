@@ -67,7 +67,7 @@ public sealed class ProductionOrder : Entity
             "em producao" or "em produção" => "InProduction",
             "finalizado" or "finalizada" => "Finished",
             "cancelado" or "cancelada" => "Canceled",
-            _ => status.Trim()
+            _ => "ExternalStatus"
         };
     }
 }
