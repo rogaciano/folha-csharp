@@ -372,6 +372,7 @@ type DapicProductionOrder = {
   lastSyncedAt: string
 }
 
+type DapicConferenceTab = 'employees' | 'products' | 'operations' | 'cells' | 'orders'
 type LoadState = 'loading' | 'ready' | 'error'
 type FeedbackType = 'success' | 'error' | 'warning'
 
@@ -4057,6 +4058,9 @@ function SettingsView({
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null)
   const [resetPasswordUser, setResetPasswordUser] = useState<SystemUser | null>(null)
   const dapicIntegration = dapicIntegrations[0] ?? null
+  const [dapicConferenceTab, setDapicConferenceTab] = useState<DapicConferenceTab>('employees')
+  const [dapicConferenceSearch, setDapicConferenceSearch] = useState('')
+  const [dapicConferenceStatus, setDapicConferenceStatus] = useState('all')
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     await Promise.resolve(onSubmit(event))
@@ -4208,6 +4212,20 @@ function SettingsView({
         <Metric label="Dapic ordens" value={dapicOrders.length} />
       </section>
 
+      <DapicConferencePanel
+        activeTab={dapicConferenceTab}
+        search={dapicConferenceSearch}
+        status={dapicConferenceStatus}
+        employees={dapicEmployees}
+        products={dapicProducts}
+        operations={dapicOperations}
+        cells={dapicCells}
+        orders={dapicOrders}
+        onTabChange={setDapicConferenceTab}
+        onSearchChange={setDapicConferenceSearch}
+        onStatusChange={setDapicConferenceStatus}
+      />
+
       <DataTable
         title="Ultimas sincronizacoes Dapic"
         columns={['Inicio', 'Recurso', 'Status', 'Paginas', 'Lidos', 'Criados', 'Atualizados', 'Erro']}
@@ -4220,70 +4238,6 @@ function SettingsView({
           String(log.recordsCreated),
           String(log.recordsUpdated),
           log.errorMessage ?? '-',
-        ])}
-      />
-
-      <DataTable
-        title="Funcionarios importados da Dapic"
-        columns={['Origem', 'ID externo', 'Nome', 'Fantasia', 'Exibicao', 'Status', 'Ultima sincronizacao']}
-        rows={dapicEmployees.slice(0, 25).map((employee) => [
-          originBadge('dapic'),
-          employee.externalId,
-          employee.name,
-          employee.fantasyName ?? '-',
-          employee.displayName ?? '-',
-          labelDapicStatus(employee.status),
-          formatDateTime(employee.lastSyncedAt),
-        ])}
-      />
-
-      <DataTable
-        title="Produtos, operacoes e celulas Dapic"
-        columns={['Origem', 'Tipo', 'ID externo', 'Referencia/Nome', 'Descricao', 'Status', 'Ultima sincronizacao']}
-        rows={[
-          ...dapicProducts.slice(0, 15).map((product) => [
-            originBadge('dapic'),
-            'Produto',
-            product.externalId,
-            product.reference,
-            product.factoryDescription,
-            labelDapicStatus(product.status),
-            formatDateTime(product.lastSyncedAt),
-          ]),
-          ...dapicOperations.slice(0, 15).map((operation) => [
-            originBadge('dapic'),
-            'Operacao',
-            operation.externalId,
-            operation.name,
-            operation.description ?? '-',
-            labelDapicStatus(operation.status),
-            formatDateTime(operation.lastSyncedAt),
-          ]),
-          ...dapicCells.slice(0, 15).map((cell) => [
-            originBadge('dapic'),
-            'Celula',
-            cell.externalId,
-            cell.name,
-            cell.description ?? '-',
-            labelDapicStatus(cell.status),
-            formatDateTime(cell.lastSyncedAt),
-          ]),
-        ]}
-      />
-
-      <DataTable
-        title="Ordens de producao Dapic"
-        columns={['Origem', 'ID externo', 'Numero', 'Descricao', 'Status', 'Data conta', 'Inicio', 'Fim', 'Ultima sincronizacao']}
-        rows={dapicOrders.slice(0, 50).map((order) => [
-          originBadge('dapic'),
-          order.externalId,
-          order.number ?? '-',
-          order.description ?? '-',
-          labelDapicStatus(order.status),
-          order.issueDate ? formatDate(order.issueDate) : '-',
-          order.startDate ? formatDate(order.startDate) : '-',
-          order.endDate ? formatDate(order.endDate) : '-',
-          formatDateTime(order.lastSyncedAt),
         ])}
       />
 
@@ -4459,6 +4413,242 @@ function NavButton({ active, onClick, children }: { active: boolean; onClick: ()
       {children}
     </button>
   )
+}
+
+function DapicConferencePanel({
+  activeTab,
+  search,
+  status,
+  employees,
+  products,
+  operations,
+  cells,
+  orders,
+  onTabChange,
+  onSearchChange,
+  onStatusChange,
+}: {
+  activeTab: DapicConferenceTab
+  search: string
+  status: string
+  employees: DapicEmployee[]
+  products: DapicProduct[]
+  operations: DapicNamedProduction[]
+  cells: DapicNamedProduction[]
+  orders: DapicProductionOrder[]
+  onTabChange: (tab: DapicConferenceTab) => void
+  onSearchChange: (value: string) => void
+  onStatusChange: (value: string) => void
+}) {
+  const tabs: Array<{ id: DapicConferenceTab; label: string; count: number }> = [
+    { id: 'employees', label: 'Funcionarios', count: employees.length },
+    { id: 'products', label: 'Produtos', count: products.length },
+    { id: 'operations', label: 'Operacoes', count: operations.length },
+    { id: 'cells', label: 'Celulas', count: cells.length },
+    { id: 'orders', label: 'Ordens', count: orders.length },
+  ]
+  const current = buildDapicConferenceRows(activeTab, { employees, products, operations, cells, orders })
+  const statuses = Array.from(new Set(current.records.map((record) => record.status).filter(Boolean))).sort((left, right) =>
+    labelDapicStatus(left).localeCompare(labelDapicStatus(right), 'pt-BR'),
+  )
+  const normalizedSearch = normalizeSearch(search)
+  const filtered = current.records.filter((record) => {
+    const statusMatches = status === 'all' || record.status === status
+    const searchMatches = !normalizedSearch || normalizeSearch(record.searchText).includes(normalizedSearch)
+    return statusMatches && searchMatches
+  })
+  const visible = filtered.slice(0, 100)
+
+  return (
+    <section className="panel dapic-conference">
+      <div className="dapic-conference-header">
+        <div>
+          <h3>Conferencia da importacao Dapic</h3>
+          <span>
+            {filtered.length} de {current.records.length} registro(s) encontrados. Exibindo ate 100 por desempenho.
+          </span>
+        </div>
+        <div className="origin-legend">
+          {originBadge('manual')}
+          {originBadge('dapic')}
+        </div>
+      </div>
+
+      <div className="tab-list" role="tablist" aria-label="Dados importados da Dapic">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={activeTab === tab.id ? 'tab-button active' : 'tab-button'}
+            onClick={() => {
+              onTabChange(tab.id)
+              onSearchChange('')
+              onStatusChange('all')
+            }}
+          >
+            {tab.label}
+            <span>{tab.count}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="dapic-filter-form">
+        <label>
+          Pesquisar
+          <input
+            value={search}
+            onChange={(event) => onSearchChange(event.currentTarget.value)}
+            placeholder="Nome, referencia, numero, ID externo..."
+          />
+        </label>
+        <label>
+          Status
+          <select value={status} onChange={(event) => onStatusChange(event.currentTarget.value)}>
+            <option value="all">Todos</option>
+            {statuses.map((statusOption) => (
+              <option key={statusOption} value={statusOption}>
+                {labelDapicStatus(statusOption)}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              {current.columns.map((column) => (
+                <th key={column}>{column}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((record) => (
+              <tr key={record.key}>
+                {record.cells.map((cell, index) => (
+                  <td key={`${record.key}-${index}`}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+            {visible.length === 0 && (
+              <tr>
+                <td colSpan={current.columns.length}>Nenhum registro encontrado para os filtros informados.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+function buildDapicConferenceRows(
+  tab: DapicConferenceTab,
+  data: {
+    employees: DapicEmployee[]
+    products: DapicProduct[]
+    operations: DapicNamedProduction[]
+    cells: DapicNamedProduction[]
+    orders: DapicProductionOrder[]
+  },
+) {
+  if (tab === 'employees') {
+    return {
+      columns: ['Origem', 'ID externo', 'Nome', 'Fantasia', 'Exibicao', 'Status', 'Ultima sincronizacao'],
+      records: data.employees.map((employee) => ({
+        key: employee.id,
+        status: employee.status,
+        searchText: [employee.externalId, employee.name, employee.fantasyName, employee.displayName, employee.status].join(' '),
+        cells: [
+          originBadge('dapic'),
+          employee.externalId,
+          employee.name,
+          employee.fantasyName ?? '-',
+          employee.displayName ?? '-',
+          dapicStatusBadge(employee.status),
+          formatDateTime(employee.lastSyncedAt),
+        ],
+      })),
+    }
+  }
+
+  if (tab === 'products') {
+    return {
+      columns: ['Origem', 'ID externo', 'Referencia', 'Descricao', 'Status', 'Ultima sincronizacao'],
+      records: data.products.map((product) => ({
+        key: product.id,
+        status: product.status,
+        searchText: [product.externalId, product.reference, product.factoryDescription, product.status].join(' '),
+        cells: [
+          originBadge('dapic'),
+          product.externalId,
+          product.reference,
+          product.factoryDescription,
+          dapicStatusBadge(product.status),
+          formatDateTime(product.lastSyncedAt),
+        ],
+      })),
+    }
+  }
+
+  if (tab === 'operations') {
+    return {
+      columns: ['Origem', 'ID externo', 'Operacao', 'Descricao', 'Status', 'Ultima sincronizacao'],
+      records: data.operations.map((operation) => ({
+        key: operation.id,
+        status: operation.status,
+        searchText: [operation.externalId, operation.name, operation.description, operation.status].join(' '),
+        cells: [
+          originBadge('dapic'),
+          operation.externalId,
+          operation.name,
+          operation.description ?? '-',
+          dapicStatusBadge(operation.status),
+          formatDateTime(operation.lastSyncedAt),
+        ],
+      })),
+    }
+  }
+
+  if (tab === 'cells') {
+    return {
+      columns: ['Origem', 'ID externo', 'Celula', 'Descricao', 'Status', 'Ultima sincronizacao'],
+      records: data.cells.map((cell) => ({
+        key: cell.id,
+        status: cell.status,
+        searchText: [cell.externalId, cell.name, cell.description, cell.status].join(' '),
+        cells: [
+          originBadge('dapic'),
+          cell.externalId,
+          cell.name,
+          cell.description ?? '-',
+          dapicStatusBadge(cell.status),
+          formatDateTime(cell.lastSyncedAt),
+        ],
+      })),
+    }
+  }
+
+  return {
+    columns: ['Origem', 'ID externo', 'Numero', 'Descricao', 'Status', 'Data conta', 'Inicio', 'Fim', 'Ultima sincronizacao'],
+    records: data.orders.map((order) => ({
+      key: order.id,
+      status: order.rawStatus ?? order.status,
+      searchText: [order.externalId, order.number, order.description, order.status, order.rawStatus].join(' '),
+      cells: [
+        originBadge('dapic'),
+        order.externalId,
+        order.number ?? '-',
+        order.description ?? '-',
+        dapicStatusBadge(order.rawStatus ?? order.status),
+        order.issueDate ? formatDate(order.issueDate) : '-',
+        order.startDate ? formatDate(order.startDate) : '-',
+        order.endDate ? formatDate(order.endDate) : '-',
+        formatDateTime(order.lastSyncedAt),
+      ],
+    })),
+  }
 }
 
 function FeedbackBanner({ message }: { message: FeedbackMessage }) {
@@ -5242,6 +5432,11 @@ function activeBadge(isActive: boolean) {
 
 function originBadge(origin: 'manual' | 'dapic') {
   return <span className={`origin-badge origin-${origin}`}>{origin === 'dapic' ? 'Dapic' : 'Manual'}</span>
+}
+
+function dapicStatusBadge(value: string) {
+  const normalized = normalizeSearch(value).replaceAll(' ', '-')
+  return <span className={`status-badge dapic-status dapic-status-${normalized}`}>{labelDapicStatus(value)}</span>
 }
 
 function entryStatusBadge(value: string) {

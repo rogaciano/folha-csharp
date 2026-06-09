@@ -564,6 +564,106 @@ th {
   font-weight: 700;
 }
 
+.dapic-conference {
+  display: grid;
+  gap: 16px;
+}
+
+.dapic-conference-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dapic-conference-header h3 {
+  margin: 0 0 4px;
+}
+
+.dapic-conference-header span,
+.origin-legend {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.origin-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid #e3e8ef;
+  padding-bottom: 10px;
+}
+
+.tab-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  background: #e8eef7;
+  color: #2f527c;
+}
+
+.tab-button.active {
+  background: #256f5c;
+  color: #ffffff;
+}
+
+.tab-button span {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #263747;
+  font-size: 12px;
+  min-height: 22px;
+  padding: 0 8px;
+}
+
+.dapic-filter-form {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(180px, 260px);
+  gap: 12px;
+}
+
+.dapic-status {
+  background: #e8eef7;
+  color: #2f527c;
+}
+
+.dapic-status-active,
+.dapic-status-success,
+.dapic-status-concluida,
+.dapic-status-finalizada,
+.dapic-status-finished {
+  background: #dff7eb;
+  color: #1f6c4d;
+}
+
+.dapic-status-error,
+.dapic-status-failed,
+.dapic-status-cancelada,
+.dapic-status-canceled {
+  background: #fde7e7;
+  color: #9f1d1d;
+}
+
+.dapic-status-running,
+.dapic-status-aguardando-inicio,
+.dapic-status-waitingstart,
+.dapic-status-em-producao,
+.dapic-status-inproduction {
+  background: #fff4d6;
+  color: #8a4b00;
+}
+
 .section-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1138,9 +1238,14 @@ th {
   }
 
   .report-toolbar,
-  .report-section-header {
+  .report-section-header,
+  .dapic-conference-header {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .dapic-filter-form {
+    grid-template-columns: 1fr;
   }
 
   .report-toolbar label {
