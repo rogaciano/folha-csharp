@@ -360,6 +360,29 @@ th {
   padding: 0 10px;
 }
 
+.origin-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  min-height: 26px;
+  padding: 0 10px;
+}
+
+.origin-manual {
+  background: #e8eef7;
+  border-color: #c8d6ea;
+  color: #2f527c;
+}
+
+.origin-dapic {
+  background: #dff7eb;
+  border-color: #afe4c9;
+  color: #1f6c4d;
+}
+
 .status-aberta,
 .status-reaberta,
 .status-active {

@@ -4142,8 +4142,9 @@ function SettingsView({
 
       <DataTable
         title="Funcionarios importados da Dapic"
-        columns={['ID externo', 'Nome', 'Fantasia', 'Exibicao', 'Status', 'Sincronizado em']}
+        columns={['Origem', 'ID externo', 'Nome', 'Fantasia', 'Exibicao', 'Status', 'Ultima sincronizacao']}
         rows={dapicEmployees.slice(0, 25).map((employee) => [
+          originBadge('dapic'),
           employee.externalId,
           employee.name,
           employee.fantasyName ?? '-',
@@ -4155,9 +4156,10 @@ function SettingsView({
 
       <DataTable
         title="Produtos, operacoes e celulas Dapic"
-        columns={['Tipo', 'ID externo', 'Referencia/Nome', 'Descricao', 'Status', 'Sincronizado em']}
+        columns={['Origem', 'Tipo', 'ID externo', 'Referencia/Nome', 'Descricao', 'Status', 'Ultima sincronizacao']}
         rows={[
           ...dapicProducts.slice(0, 15).map((product) => [
+            originBadge('dapic'),
             'Produto',
             product.externalId,
             product.reference,
@@ -4166,6 +4168,7 @@ function SettingsView({
             formatDateTime(product.lastSyncedAt),
           ]),
           ...dapicOperations.slice(0, 15).map((operation) => [
+            originBadge('dapic'),
             'Operacao',
             operation.externalId,
             operation.name,
@@ -4174,6 +4177,7 @@ function SettingsView({
             formatDateTime(operation.lastSyncedAt),
           ]),
           ...dapicCells.slice(0, 15).map((cell) => [
+            originBadge('dapic'),
             'Celula',
             cell.externalId,
             cell.name,
@@ -4186,8 +4190,9 @@ function SettingsView({
 
       <DataTable
         title="Ordens de producao Dapic"
-        columns={['ID externo', 'Numero', 'Descricao', 'Status', 'Data conta', 'Inicio', 'Fim', 'Sincronizado em']}
+        columns={['Origem', 'ID externo', 'Numero', 'Descricao', 'Status', 'Data conta', 'Inicio', 'Fim', 'Ultima sincronizacao']}
         rows={dapicOrders.slice(0, 50).map((order) => [
+          originBadge('dapic'),
           order.externalId,
           order.number ?? '-',
           order.description ?? '-',
@@ -5150,6 +5155,10 @@ function statusBadge(value: string) {
 
 function activeBadge(isActive: boolean) {
   return <span className={`status-badge ${isActive ? 'status-active' : 'status-inactive'}`}>{isActive ? 'Ativo' : 'Inativo'}</span>
+}
+
+function originBadge(origin: 'manual' | 'dapic') {
+  return <span className={`origin-badge origin-${origin}`}>{origin === 'dapic' ? 'Dapic' : 'Manual'}</span>
 }
 
 function entryStatusBadge(value: string) {
