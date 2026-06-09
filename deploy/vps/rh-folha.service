@@ -3,8 +3,8 @@ Description=RH Folha API
 After=network.target postgresql.service
 
 [Service]
-WorkingDirectory=/opt/rh-folha/api
-ExecStart=/usr/bin/dotnet /opt/rh-folha/api/RhFolha.Api.dll
+WorkingDirectory=/opt/rh-folha/publish/api
+ExecStart=/usr/bin/dotnet /opt/rh-folha/publish/api/RhFolha.Api.dll
 Restart=always
 RestartSec=10
 KillSignal=SIGINT
