@@ -44,6 +44,13 @@ public sealed class ExternalSyncLog : Entity
     public Guid? CreatedByUserId { get; private set; }
     public SystemUser? CreatedByUser { get; private set; }
 
+    public void SetRequestedPeriod(DateOnly? requestedFrom, DateOnly? requestedTo)
+    {
+        RequestedFrom = requestedFrom;
+        RequestedTo = requestedTo;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void Finish(
         string status,
         int pageCount,

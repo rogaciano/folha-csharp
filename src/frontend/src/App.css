@@ -548,6 +548,16 @@ th {
   padding-top: 16px;
 }
 
+.integration-order-sync {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 240px)) auto;
+  align-items: end;
+  gap: 12px;
+  border-top: 1px solid #e3e8ef;
+  margin-top: 12px;
+  padding-top: 16px;
+}
+
 .section-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1095,6 +1105,7 @@ th {
   .period-form,
   .statutory-table-form,
   .integration-layout,
+  .integration-order-sync,
   .check-group {
     grid-template-columns: 1fr;
   }

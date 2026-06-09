@@ -111,13 +111,18 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
             cancellationToken);
     }
 
-    public async Task<DapicSyncResult> SyncProductionOrdersAsync(ExternalIntegration integration, Guid? userId, CancellationToken cancellationToken)
+    public async Task<DapicSyncResult> SyncProductionOrdersAsync(
+        ExternalIntegration integration,
+        Guid? userId,
+        DateOnly startDate,
+        DateOnly? endDate,
+        CancellationToken cancellationToken)
     {
         return await SyncPagedAsync(
             integration,
             "ProductionOrders",
             userId,
-            (page, token) => dapicClient.GetProductionOrdersAsync(integration.BaseUrl, token, page, PageSize, cancellationToken),
+            (page, token) => dapicClient.GetProductionOrdersAsync(integration.BaseUrl, token, page, PageSize, startDate, endDate, cancellationToken),
             async items =>
             {
                 var created = 0;
@@ -154,6 +159,8 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
 
                 return (created, updated);
             },
+            startDate,
+            endDate,
             cancellationToken);
     }
 
@@ -242,7 +249,21 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
         Func<IReadOnlyList<T>, Task<(int Created, int Updated)>> persistPage,
         CancellationToken cancellationToken)
     {
+        return await SyncPagedAsync(integration, resource, userId, fetchPage, persistPage, null, null, cancellationToken);
+    }
+
+    private async Task<DapicSyncResult> SyncPagedAsync<T>(
+        ExternalIntegration integration,
+        string resource,
+        Guid? userId,
+        Func<int, string, Task<DapicPagedResult<T>>> fetchPage,
+        Func<IReadOnlyList<T>, Task<(int Created, int Updated)>> persistPage,
+        DateOnly? requestedFrom,
+        DateOnly? requestedTo,
+        CancellationToken cancellationToken)
+    {
         var log = new ExternalSyncLog(integration.CompanyId, integration.Id, "Dapic", resource, userId);
+        log.SetRequestedPeriod(requestedFrom, requestedTo);
         dbContext.ExternalSyncLogs.Add(log);
 
         var token = await GetValidTokenAsync(integration, cancellationToken);

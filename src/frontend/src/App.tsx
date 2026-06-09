@@ -408,6 +408,8 @@ function App() {
   const [message, setMessage] = useState<FeedbackMessage | null>(null)
   const [messageModal, setMessageModal] = useState('')
   const [dapicBusyMessage, setDapicBusyMessage] = useState<string | null>(null)
+  const [dapicOrderStartDate, setDapicOrderStartDate] = useState(() => currentMonthStart())
+  const [dapicOrderEndDate, setDapicOrderEndDate] = useState(() => currentMonthEnd())
 
   const activeCompany = companies[0]
 
@@ -1240,8 +1242,21 @@ function App() {
   async function handleDapicSync(integration: DapicIntegration, resource: string) {
     setDapicBusyMessage(`Importando ${labelDapicResource(resource).toLowerCase()} da Dapic...`)
     try {
+      if (resource === 'orders' && !dapicOrderStartDate) {
+        showMessage('Informe a data inicial para sincronizar ordens de producao.', 'warning')
+        return
+      }
+
       const response = await apiFetch(`/integrations/dapic/${integration.id}/sync/${resource}`, {
         method: 'POST',
+        headers: resource === 'orders' ? { 'Content-Type': 'application/json' } : undefined,
+        body:
+          resource === 'orders'
+            ? JSON.stringify({
+                dataInicial: dapicOrderStartDate,
+                dataFinal: dapicOrderEndDate || null,
+              })
+            : undefined,
       })
 
       if (!response.ok) {
@@ -1462,6 +1477,8 @@ function App() {
             dapicCells={dapicCells}
             dapicOrders={dapicOrders}
             dapicBusyMessage={dapicBusyMessage}
+            dapicOrderStartDate={dapicOrderStartDate}
+            dapicOrderEndDate={dapicOrderEndDate}
             currentUser={session.user}
             onSubmit={handleStatutoryTableSubmit}
             onToggleStatus={handleToggleStatutoryTableStatus}
@@ -1473,6 +1490,8 @@ function App() {
             onDapicConfigure={handleDapicConfigure}
             onDapicTest={handleDapicTest}
             onDapicSync={handleDapicSync}
+            onDapicOrderStartDateChange={setDapicOrderStartDate}
+            onDapicOrderEndDateChange={setDapicOrderEndDate}
           />
         )}
       </section>
@@ -3973,6 +3992,8 @@ function SettingsView({
   dapicCells,
   dapicOrders,
   dapicBusyMessage,
+  dapicOrderStartDate,
+  dapicOrderEndDate,
   currentUser,
   onSubmit,
   onToggleStatus,
@@ -3984,6 +4005,8 @@ function SettingsView({
   onDapicConfigure,
   onDapicTest,
   onDapicSync,
+  onDapicOrderStartDateChange,
+  onDapicOrderEndDateChange,
 }: {
   activeCompany: Company | undefined
   companies: Company[]
@@ -3998,6 +4021,8 @@ function SettingsView({
   dapicCells: DapicNamedProduction[]
   dapicOrders: DapicProductionOrder[]
   dapicBusyMessage: string | null
+  dapicOrderStartDate: string
+  dapicOrderEndDate: string
   currentUser: AuthUser
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onToggleStatus: (table: StatutoryTable) => void
@@ -4009,6 +4034,8 @@ function SettingsView({
   onDapicConfigure: (event: FormEvent<HTMLFormElement>) => void
   onDapicTest: (integration: DapicIntegration) => void
   onDapicSync: (integration: DapicIntegration, resource: string) => void
+  onDapicOrderStartDateChange: (value: string) => void
+  onDapicOrderEndDateChange: (value: string) => void
 }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isUserModalOpen, setIsUserModalOpen] = useState(false)
@@ -4128,6 +4155,26 @@ function SettingsView({
           <button type="button" disabled={!dapicIntegration || Boolean(dapicBusyMessage)} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'cells')}>
             Sincronizar celulas
           </button>
+        </div>
+
+        <div className="integration-order-sync">
+          <label>
+            Data inicial das ordens
+            <input
+              type="date"
+              value={dapicOrderStartDate}
+              onChange={(event) => onDapicOrderStartDateChange(event.currentTarget.value)}
+              required
+            />
+          </label>
+          <label>
+            Data final das ordens
+            <input
+              type="date"
+              value={dapicOrderEndDate}
+              onChange={(event) => onDapicOrderEndDateChange(event.currentTarget.value)}
+            />
+          </label>
           <button type="button" disabled={!dapicIntegration || Boolean(dapicBusyMessage)} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'orders')}>
             Sincronizar ordens
           </button>
@@ -5290,6 +5337,23 @@ function formatDate(value: string) {
 function nextYearStart(value: string) {
   const year = Number(value.slice(0, 4))
   return `${year + 1}-01-01`
+}
+
+function currentMonthStart() {
+  const now = new Date()
+  return toInputDate(new Date(now.getFullYear(), now.getMonth(), 1))
+}
+
+function currentMonthEnd() {
+  const now = new Date()
+  return toInputDate(new Date(now.getFullYear(), now.getMonth() + 1, 0))
+}
+
+function toInputDate(value: Date) {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function formatDateTime(value: string) {

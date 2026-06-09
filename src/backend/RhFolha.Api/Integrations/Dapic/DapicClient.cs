@@ -108,9 +108,17 @@ public sealed class DapicClient(HttpClient httpClient)
         string accessToken,
         int page,
         int pageSize,
+        DateOnly startDate,
+        DateOnly? endDate,
         CancellationToken cancellationToken)
     {
-        return GetPagedAsync<DapicProductionOrderDto>(baseUrl, accessToken, $"/v1/ordensproducao?Pagina={page}&RegistrosPorPagina={pageSize}", cancellationToken);
+        var path = $"/v1/ordensproducao?Pagina={page}&RegistrosPorPagina={pageSize}&DataInicial={startDate:yyyy-MM-dd}";
+        if (endDate.HasValue)
+        {
+            path += $"&DataFinal={endDate.Value:yyyy-MM-dd}";
+        }
+
+        return GetPagedAsync<DapicProductionOrderDto>(baseUrl, accessToken, path, cancellationToken);
     }
 
     private async Task<DapicPagedResult<T>> GetPagedAsync<T>(

@@ -123,7 +123,13 @@ public sealed class DapicIntegrationsController(
     }
 
     [HttpPost("{id:guid}/sync/{resource}")]
-    public async Task<IActionResult> Sync(Guid id, string resource, CancellationToken cancellationToken)
+    public async Task<IActionResult> Sync(
+        Guid id,
+        string resource,
+        [FromQuery] DateOnly? dataInicial,
+        [FromQuery] DateOnly? dataFinal,
+        [FromBody] SyncDapicResourceRequest? request,
+        CancellationToken cancellationToken)
     {
         var integration = await dbContext.ExternalIntegrations.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
 
@@ -141,7 +147,12 @@ public sealed class DapicIntegrationsController(
                 "products" or "produtos" => await syncService.SyncProductsAsync(integration, userId, cancellationToken),
                 "operations" or "operacoes" => await syncService.SyncOperationsAsync(integration, userId, cancellationToken),
                 "cells" or "celulas" => await syncService.SyncCellsAsync(integration, userId, cancellationToken),
-                "orders" or "ordens" or "ordensproducao" => await syncService.SyncProductionOrdersAsync(integration, userId, cancellationToken),
+                "orders" or "ordens" or "ordensproducao" => await syncService.SyncProductionOrdersAsync(
+                    integration,
+                    userId,
+                    request?.DataInicial ?? dataInicial ?? throw new InvalidOperationException("Informe a data inicial para sincronizar ordens de producao."),
+                    request?.DataFinal ?? dataFinal,
+                    cancellationToken),
                 _ => throw new InvalidOperationException("Recurso de sincronizacao nao suportado.")
             };
 
@@ -302,6 +313,8 @@ public sealed record ConfigureDapicIntegrationRequest(
     string? BaseUrl,
     string ExternalCompanyIdentifier,
     string IntegrationToken);
+
+public sealed record SyncDapicResourceRequest(DateOnly? DataInicial, DateOnly? DataFinal);
 
 public sealed record DapicIntegrationResponse(
     Guid Id,
