@@ -550,12 +550,18 @@ th {
 
 .integration-order-sync {
   display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 240px)) auto;
+  grid-template-columns: minmax(180px, 240px) auto minmax(220px, 1fr);
   align-items: end;
   gap: 12px;
   border-top: 1px solid #e3e8ef;
   margin-top: 12px;
   padding-top: 16px;
+}
+
+.integration-order-sync span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .section-actions {
