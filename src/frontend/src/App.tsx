@@ -300,6 +300,64 @@ type AuditLog = {
   ipAddress: string | null
 }
 
+type DapicIntegration = {
+  id: string
+  companyId: string
+  name: string
+  baseUrl: string
+  externalCompanyIdentifier: string
+  accessTokenExpiresAt: string | null
+  lastSyncAt: string | null
+  status: string
+  lastError: string | null
+}
+
+type DapicSyncLog = {
+  id: string
+  resource: string
+  startedAt: string
+  finishedAt: string | null
+  status: string
+  pageCount: number
+  recordsRead: number
+  recordsCreated: number
+  recordsUpdated: number
+  recordsIgnored: number
+  errorMessage: string | null
+}
+
+type DapicEmployee = {
+  id: string
+  companyId: string
+  externalId: string
+  name: string
+  fantasyName: string | null
+  displayName: string | null
+  status: string
+  isIgnored: boolean
+  lastSyncedAt: string
+}
+
+type DapicProduct = {
+  id: string
+  companyId: string
+  externalId: string
+  reference: string
+  factoryDescription: string
+  status: string
+  lastSyncedAt: string
+}
+
+type DapicNamedProduction = {
+  id: string
+  companyId: string
+  externalId: string
+  name: string
+  description: string | null
+  status: string
+  lastSyncedAt: string
+}
+
 type LoadState = 'loading' | 'ready' | 'error'
 type FeedbackType = 'success' | 'error' | 'warning'
 
@@ -325,6 +383,12 @@ function App() {
   const [statutoryTables, setStatutoryTables] = useState<StatutoryTable[]>([])
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
+  const [dapicIntegrations, setDapicIntegrations] = useState<DapicIntegration[]>([])
+  const [dapicLogs, setDapicLogs] = useState<DapicSyncLog[]>([])
+  const [dapicEmployees, setDapicEmployees] = useState<DapicEmployee[]>([])
+  const [dapicProducts, setDapicProducts] = useState<DapicProduct[]>([])
+  const [dapicOperations, setDapicOperations] = useState<DapicNamedProduction[]>([])
+  const [dapicCells, setDapicCells] = useState<DapicNamedProduction[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [message, setMessage] = useState<FeedbackMessage | null>(null)
   const [messageModal, setMessageModal] = useState('')
@@ -434,20 +498,63 @@ function App() {
       setPayrollCalculations(await payrollCalculationsResponse.json())
       setStatutoryTables(await statutoryTablesResponse.json())
       if (isAdmin(session.user.role)) {
-        const [usersResponse, auditLogsResponse] = await Promise.all([
+        const [
+          usersResponse,
+          auditLogsResponse,
+          dapicIntegrationsResponse,
+          dapicEmployeesResponse,
+          dapicProductsResponse,
+          dapicOperationsResponse,
+          dapicCellsResponse,
+        ] = await Promise.all([
           apiFetch('/users'),
           apiFetch('/audit-logs'),
+          apiFetch('/integrations/dapic'),
+          apiFetch('/integrations/dapic/employees'),
+          apiFetch('/integrations/dapic/products'),
+          apiFetch('/integrations/dapic/operations'),
+          apiFetch('/integrations/dapic/cells'),
         ])
 
-        if (!usersResponse.ok || !auditLogsResponse.ok) {
+        if (
+          !usersResponse.ok ||
+          !auditLogsResponse.ok ||
+          !dapicIntegrationsResponse.ok ||
+          !dapicEmployeesResponse.ok ||
+          !dapicProductsResponse.ok ||
+          !dapicOperationsResponse.ok ||
+          !dapicCellsResponse.ok
+        ) {
           throw new Error('Falha ao carregar configuracoes administrativas')
         }
 
         setSystemUsers(await usersResponse.json())
         setAuditLogs(await auditLogsResponse.json())
+        const integrations = (await dapicIntegrationsResponse.json()) as DapicIntegration[]
+        setDapicIntegrations(integrations)
+        setDapicEmployees(await dapicEmployeesResponse.json())
+        setDapicProducts(await dapicProductsResponse.json())
+        setDapicOperations(await dapicOperationsResponse.json())
+        setDapicCells(await dapicCellsResponse.json())
+
+        if (integrations[0]) {
+          const dapicLogsResponse = await apiFetch(`/integrations/dapic/${integrations[0].id}/logs`)
+          if (!dapicLogsResponse.ok) {
+            throw new Error('Falha ao carregar logs da integracao Dapic')
+          }
+          setDapicLogs(await dapicLogsResponse.json())
+        } else {
+          setDapicLogs([])
+        }
       } else {
         setSystemUsers([])
         setAuditLogs([])
+        setDapicIntegrations([])
+        setDapicLogs([])
+        setDapicEmployees([])
+        setDapicProducts([])
+        setDapicOperations([])
+        setDapicCells([])
       }
       setLoadState('ready')
     } catch {
@@ -502,6 +609,12 @@ function App() {
     setStatutoryTables([])
     setSystemUsers([])
     setAuditLogs([])
+    setDapicIntegrations([])
+    setDapicLogs([])
+    setDapicEmployees([])
+    setDapicProducts([])
+    setDapicOperations([])
+    setDapicCells([])
     setLoadState('loading')
   }
 
@@ -1057,6 +1170,77 @@ function App() {
     }
   }
 
+  async function handleDapicConfigure(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!activeCompany) return
+
+    const form = event.currentTarget
+    const data = new FormData(form)
+
+    try {
+      await postData('/integrations/dapic/configure', {
+        companyId: activeCompany.id,
+        name: data.get('name'),
+        baseUrl: data.get('baseUrl'),
+        externalCompanyIdentifier: data.get('externalCompanyIdentifier'),
+        integrationToken: data.get('integrationToken'),
+      })
+      showMessage('Integracao Dapic configurada.')
+      setMessageModal('Integracao Dapic configurada com sucesso.')
+    } catch {
+      showMessage('Nao foi possivel configurar a integracao Dapic.')
+    }
+  }
+
+  async function handleDapicTest(integration: DapicIntegration) {
+    try {
+      const response = await apiFetch(`/integrations/dapic/${integration.id}/test-connection`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error('Falha no teste de conexao')
+      }
+
+      const result = (await response.json()) as { tokenExpiresAt: string }
+      await loadData()
+      showMessage('Conexao com Dapic testada.')
+      setMessageModal(`Conexao com Dapic validada. Token valido ate ${formatDateTime(result.tokenExpiresAt)}.`)
+    } catch {
+      await loadData()
+      showMessage('Nao foi possivel conectar com a Dapic.')
+    }
+  }
+
+  async function handleDapicSync(integration: DapicIntegration, resource: string) {
+    try {
+      const response = await apiFetch(`/integrations/dapic/${integration.id}/sync/${resource}`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error('Falha na sincronizacao')
+      }
+
+      const result = (await response.json()) as {
+        resource: string
+        recordsRead: number
+        recordsCreated: number
+        recordsUpdated: number
+        recordsIgnored: number
+      }
+
+      await loadData()
+      showMessage('Sincronizacao Dapic concluida.')
+      setMessageModal(
+        `${labelDapicResource(result.resource)} sincronizado: ${result.recordsRead} lido(s), ${result.recordsCreated} criado(s), ${result.recordsUpdated} atualizado(s), ${result.recordsIgnored} ignorado(s).`,
+      )
+    } catch {
+      await loadData()
+      showMessage('Nao foi possivel sincronizar dados da Dapic.')
+    }
+  }
+
   if (!session) {
     return <LoginView message={loginMessage} onSubmit={handleLoginSubmit} />
   }
@@ -1242,6 +1426,12 @@ function App() {
             statutoryTables={statutoryTables}
             users={systemUsers}
             auditLogs={auditLogs}
+            dapicIntegrations={dapicIntegrations}
+            dapicLogs={dapicLogs}
+            dapicEmployees={dapicEmployees}
+            dapicProducts={dapicProducts}
+            dapicOperations={dapicOperations}
+            dapicCells={dapicCells}
             currentUser={session.user}
             onSubmit={handleStatutoryTableSubmit}
             onToggleStatus={handleToggleStatutoryTableStatus}
@@ -1250,6 +1440,9 @@ function App() {
             onUserUpdate={handleUserUpdate}
             onUserResetPassword={handleUserResetPassword}
             onUserToggleStatus={handleUserToggleStatus}
+            onDapicConfigure={handleDapicConfigure}
+            onDapicTest={handleDapicTest}
+            onDapicSync={handleDapicSync}
           />
         )}
       </section>
@@ -3742,6 +3935,12 @@ function SettingsView({
   statutoryTables,
   users,
   auditLogs,
+  dapicIntegrations,
+  dapicLogs,
+  dapicEmployees,
+  dapicProducts,
+  dapicOperations,
+  dapicCells,
   currentUser,
   onSubmit,
   onToggleStatus,
@@ -3750,12 +3949,21 @@ function SettingsView({
   onUserUpdate,
   onUserResetPassword,
   onUserToggleStatus,
+  onDapicConfigure,
+  onDapicTest,
+  onDapicSync,
 }: {
   activeCompany: Company | undefined
   companies: Company[]
   statutoryTables: StatutoryTable[]
   users: SystemUser[]
   auditLogs: AuditLog[]
+  dapicIntegrations: DapicIntegration[]
+  dapicLogs: DapicSyncLog[]
+  dapicEmployees: DapicEmployee[]
+  dapicProducts: DapicProduct[]
+  dapicOperations: DapicNamedProduction[]
+  dapicCells: DapicNamedProduction[]
   currentUser: AuthUser
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onToggleStatus: (table: StatutoryTable) => void
@@ -3764,11 +3972,15 @@ function SettingsView({
   onUserUpdate: (user: SystemUser, event: FormEvent<HTMLFormElement>) => void
   onUserResetPassword: (user: SystemUser, event: FormEvent<HTMLFormElement>) => void
   onUserToggleStatus: (user: SystemUser) => void
+  onDapicConfigure: (event: FormEvent<HTMLFormElement>) => void
+  onDapicTest: (integration: DapicIntegration) => void
+  onDapicSync: (integration: DapicIntegration, resource: string) => void
 }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isUserModalOpen, setIsUserModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null)
   const [resetPasswordUser, setResetPasswordUser] = useState<SystemUser | null>(null)
+  const dapicIntegration = dapicIntegrations[0] ?? null
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     await Promise.resolve(onSubmit(event))
@@ -3796,6 +4008,153 @@ function SettingsView({
           ))}
         </div>
       </Panel>
+
+      <Panel title="Integracao Dapic">
+        <div className="integration-layout">
+          <form
+            key={dapicIntegration?.id ?? 'new-dapic'}
+            className="entry-form"
+            onSubmit={(event) => onDapicConfigure(event)}
+          >
+            <label>
+              Nome
+              <input name="name" defaultValue={dapicIntegration?.name ?? 'Dapic Webpic'} required />
+            </label>
+            <label>
+              URL base
+              <input name="baseUrl" defaultValue={dapicIntegration?.baseUrl ?? 'https://api.dapic.app'} required />
+            </label>
+            <label>
+              Empresa Dapic
+              <input
+                name="externalCompanyIdentifier"
+                defaultValue={dapicIntegration?.externalCompanyIdentifier ?? ''}
+                placeholder="Identificador informado pela Dapic"
+                required
+              />
+            </label>
+            <label className="span-2">
+              Token de integracao
+              <input
+                name="integrationToken"
+                type="password"
+                placeholder={dapicIntegration ? 'Informe o token para salvar a configuracao' : 'TokenIntegracao'}
+                required
+              />
+            </label>
+            <button type="submit" disabled={!activeCompany}>
+              Salvar configuracao
+            </button>
+          </form>
+
+          <div className="integration-summary">
+            <div>
+              <span>Status</span>
+              <strong>{dapicIntegration ? labelDapicStatus(dapicIntegration.status) : 'Nao configurada'}</strong>
+            </div>
+            <div>
+              <span>Ultima sincronizacao</span>
+              <strong>{dapicIntegration?.lastSyncAt ? formatDateTime(dapicIntegration.lastSyncAt) : '-'}</strong>
+            </div>
+            <div>
+              <span>Token valido ate</span>
+              <strong>
+                {dapicIntegration?.accessTokenExpiresAt ? formatDateTime(dapicIntegration.accessTokenExpiresAt) : '-'}
+              </strong>
+            </div>
+            {dapicIntegration?.lastError && (
+              <div className="integration-error">
+                <span>Ultimo erro</span>
+                <strong>{dapicIntegration.lastError}</strong>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="quick-actions integration-actions">
+          <button type="button" disabled={!dapicIntegration} onClick={() => dapicIntegration && onDapicTest(dapicIntegration)}>
+            Testar conexao
+          </button>
+          <button type="button" disabled={!dapicIntegration} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'employees')}>
+            Sincronizar funcionarios
+          </button>
+          <button type="button" disabled={!dapicIntegration} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'products')}>
+            Sincronizar produtos
+          </button>
+          <button type="button" disabled={!dapicIntegration} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'operations')}>
+            Sincronizar operacoes
+          </button>
+          <button type="button" disabled={!dapicIntegration} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'cells')}>
+            Sincronizar celulas
+          </button>
+        </div>
+      </Panel>
+
+      <section className="metrics-grid">
+        <Metric label="Dapic funcionarios" value={dapicEmployees.length} />
+        <Metric label="Dapic produtos" value={dapicProducts.length} />
+        <Metric label="Dapic operacoes" value={dapicOperations.length} />
+        <Metric label="Dapic celulas" value={dapicCells.length} />
+      </section>
+
+      <DataTable
+        title="Ultimas sincronizacoes Dapic"
+        columns={['Inicio', 'Recurso', 'Status', 'Paginas', 'Lidos', 'Criados', 'Atualizados', 'Erro']}
+        rows={dapicLogs.map((log) => [
+          formatDateTime(log.startedAt),
+          labelDapicResource(log.resource),
+          labelDapicStatus(log.status),
+          String(log.pageCount),
+          String(log.recordsRead),
+          String(log.recordsCreated),
+          String(log.recordsUpdated),
+          log.errorMessage ?? '-',
+        ])}
+      />
+
+      <DataTable
+        title="Funcionarios importados da Dapic"
+        columns={['ID externo', 'Nome', 'Fantasia', 'Exibicao', 'Status', 'Sincronizado em']}
+        rows={dapicEmployees.slice(0, 25).map((employee) => [
+          employee.externalId,
+          employee.name,
+          employee.fantasyName ?? '-',
+          employee.displayName ?? '-',
+          labelDapicStatus(employee.status),
+          formatDateTime(employee.lastSyncedAt),
+        ])}
+      />
+
+      <DataTable
+        title="Produtos, operacoes e celulas Dapic"
+        columns={['Tipo', 'ID externo', 'Referencia/Nome', 'Descricao', 'Status', 'Sincronizado em']}
+        rows={[
+          ...dapicProducts.slice(0, 15).map((product) => [
+            'Produto',
+            product.externalId,
+            product.reference,
+            product.factoryDescription,
+            labelDapicStatus(product.status),
+            formatDateTime(product.lastSyncedAt),
+          ]),
+          ...dapicOperations.slice(0, 15).map((operation) => [
+            'Operacao',
+            operation.externalId,
+            operation.name,
+            operation.description ?? '-',
+            labelDapicStatus(operation.status),
+            formatDateTime(operation.lastSyncedAt),
+          ]),
+          ...dapicCells.slice(0, 15).map((cell) => [
+            'Celula',
+            cell.externalId,
+            cell.name,
+            cell.description ?? '-',
+            labelDapicStatus(cell.status),
+            formatDateTime(cell.lastSyncedAt),
+          ]),
+        ]}
+      />
 
       {isCreateModalOpen && (
         <Modal title="Nova tabela legal" onClose={() => setIsCreateModalOpen(false)} size="wide">
@@ -4656,6 +5015,36 @@ function labelStatutoryTableType(value: string) {
   }
 
   return labels[value] ?? value.toUpperCase()
+}
+
+function labelDapicResource(value: string) {
+  const labels: Record<string, string> = {
+    employees: 'Funcionarios',
+    funcionarios: 'Funcionarios',
+    products: 'Produtos',
+    produtos: 'Produtos',
+    operations: 'Operacoes',
+    operacoes: 'Operacoes',
+    cells: 'Celulas',
+    celulas: 'Celulas',
+  }
+
+  return labels[value.toLowerCase()] ?? value
+}
+
+function labelDapicStatus(value: string) {
+  const labels: Record<string, string> = {
+    active: 'Ativa',
+    inactive: 'Inativa',
+    error: 'Erro',
+    running: 'Em andamento',
+    success: 'Sucesso',
+    completed: 'Concluida',
+    failed: 'Falha',
+    unknown: 'Nao informado',
+  }
+
+  return labels[value.toLowerCase()] ?? value
 }
 
 function formatStatutoryRanges(ranges: StatutoryTableRange[]) {

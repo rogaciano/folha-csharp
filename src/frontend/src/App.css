@@ -456,6 +456,47 @@ th {
   gap: 10px;
 }
 
+.integration-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 16px;
+}
+
+.integration-summary {
+  display: grid;
+  gap: 10px;
+}
+
+.integration-summary div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #e3e8ef;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.integration-summary span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.integration-summary strong {
+  color: #263747;
+  overflow-wrap: anywhere;
+}
+
+.integration-summary .integration-error {
+  background: #fde7e7;
+}
+
+.integration-actions {
+  border-top: 1px solid #e3e8ef;
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
 .section-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1002,6 +1043,7 @@ th {
   .employee-responsible-form,
   .period-form,
   .statutory-table-form,
+  .integration-layout,
   .check-group {
     grid-template-columns: 1fr;
   }
