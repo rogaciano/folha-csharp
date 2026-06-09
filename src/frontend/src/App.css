@@ -666,11 +666,14 @@ th {
 
 .pagination-bar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: flex-start;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8px;
   border-top: 1px solid #e3e8ef;
   padding-top: 12px;
+  max-width: 100%;
+  overflow: visible;
 }
 
 .pagination-bar span {
@@ -682,12 +685,15 @@ th {
 .pagination-actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 8px;
+  max-width: 100%;
 }
 
 .pagination-actions button {
   min-height: 34px;
+  min-width: 92px;
+  padding: 0 12px;
 }
 
 .section-actions {
@@ -1295,19 +1301,6 @@ th {
   .employee-toolbar,
   .employee-section-header,
   .modal-actions,
-  .pagination-bar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .pagination-actions {
-    justify-content: stretch;
-  }
-
-  .pagination-actions button {
-    flex: 1;
-  }
-
   .modal-backdrop {
     padding: 12px;
   }
