@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Globalization;
 
 namespace RhFolha.Api.Integrations.Dapic;
 
@@ -129,8 +130,31 @@ public sealed class DapicClient(HttpClient httpClient)
             throw new DapicClientException($"Falha ao consultar Dapic. HTTP {(int)response.StatusCode}: {content}");
         }
 
-        return JsonSerializer.Deserialize<DapicPagedResult<T>>(content, JsonOptions)
-            ?? new DapicPagedResult<T>([], 0, 1, 0, 1);
+        using var document = JsonDocument.Parse(content);
+        var root = document.RootElement;
+        var items = DeserializeItems<T>(root);
+
+        return new DapicPagedResult<T>(
+            items,
+            ReadInt(root, "TotalRegistros") ?? items.Count,
+            ReadInt(root, "Pagina") ?? 1,
+            ReadInt(root, "RegistrosPorPagina") ?? items.Count,
+            ReadInt(root, "TotalPaginas") ?? 1);
+    }
+
+    private static IReadOnlyList<T> DeserializeItems<T>(JsonElement root)
+    {
+        var itemsElement = TryGetProperty(root, "Dados")
+            ?? TryGetProperty(root, "dados")
+            ?? TryGetProperty(root, "Data")
+            ?? TryGetProperty(root, "data");
+
+        if (itemsElement is null || itemsElement.Value.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        return JsonSerializer.Deserialize<IReadOnlyList<T>>(itemsElement.Value.GetRawText(), JsonOptions) ?? [];
     }
 
     private static Uri BuildUrl(string baseUrl, string path)
@@ -159,19 +183,49 @@ public sealed class DapicClient(HttpClient httpClient)
 
     private static int? ReadInt(JsonElement element, string propertyName)
     {
-        if (!element.TryGetProperty(propertyName, out var property))
+        var property = TryGetProperty(element, propertyName);
+        if (property is null)
         {
             return null;
         }
 
-        if (property.ValueKind == JsonValueKind.Number && property.TryGetInt32(out var numberValue))
+        if (property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetInt32(out var numberValue))
         {
             return numberValue;
         }
 
-        return property.ValueKind == JsonValueKind.String && int.TryParse(property.GetString(), out var stringValue)
-            ? stringValue
+        if (property.Value.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        var text = property.Value.GetString();
+        if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intValue))
+        {
+            return intValue;
+        }
+
+        return decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var decimalValue)
+            ? decimal.ToInt32(decimal.Truncate(decimalValue))
             : null;
+    }
+
+    private static JsonElement? TryGetProperty(JsonElement element, string propertyName)
+    {
+        if (element.TryGetProperty(propertyName, out var exactProperty))
+        {
+            return exactProperty;
+        }
+
+        foreach (var property in element.EnumerateObject())
+        {
+            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                return property.Value;
+            }
+        }
+
+        return null;
     }
 }
 

@@ -407,6 +407,7 @@ function App() {
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [message, setMessage] = useState<FeedbackMessage | null>(null)
   const [messageModal, setMessageModal] = useState('')
+  const [dapicBusyMessage, setDapicBusyMessage] = useState<string | null>(null)
 
   const activeCompany = companies[0]
 
@@ -1214,6 +1215,7 @@ function App() {
   }
 
   async function handleDapicTest(integration: DapicIntegration) {
+    setDapicBusyMessage('Testando conexao com a Dapic...')
     try {
       const response = await apiFetch(`/integrations/dapic/${integration.id}/test-connection`, {
         method: 'POST',
@@ -1230,10 +1232,13 @@ function App() {
     } catch {
       await loadData()
       showMessage('Nao foi possivel conectar com a Dapic.')
+    } finally {
+      setDapicBusyMessage(null)
     }
   }
 
   async function handleDapicSync(integration: DapicIntegration, resource: string) {
+    setDapicBusyMessage(`Importando ${labelDapicResource(resource).toLowerCase()} da Dapic...`)
     try {
       const response = await apiFetch(`/integrations/dapic/${integration.id}/sync/${resource}`, {
         method: 'POST',
@@ -1259,6 +1264,8 @@ function App() {
     } catch {
       await loadData()
       showMessage('Nao foi possivel sincronizar dados da Dapic.')
+    } finally {
+      setDapicBusyMessage(null)
     }
   }
 
@@ -1454,6 +1461,7 @@ function App() {
             dapicOperations={dapicOperations}
             dapicCells={dapicCells}
             dapicOrders={dapicOrders}
+            dapicBusyMessage={dapicBusyMessage}
             currentUser={session.user}
             onSubmit={handleStatutoryTableSubmit}
             onToggleStatus={handleToggleStatutoryTableStatus}
@@ -3964,6 +3972,7 @@ function SettingsView({
   dapicOperations,
   dapicCells,
   dapicOrders,
+  dapicBusyMessage,
   currentUser,
   onSubmit,
   onToggleStatus,
@@ -3988,6 +3997,7 @@ function SettingsView({
   dapicOperations: DapicNamedProduction[]
   dapicCells: DapicNamedProduction[]
   dapicOrders: DapicProductionOrder[]
+  dapicBusyMessage: string | null
   currentUser: AuthUser
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onToggleStatus: (table: StatutoryTable) => void
@@ -4034,6 +4044,13 @@ function SettingsView({
       </Panel>
 
       <Panel title="Integracao Dapic">
+        {dapicBusyMessage && (
+          <div className="integration-progress" role="status" aria-live="polite">
+            <span className="loading-spinner" />
+            <strong>{dapicBusyMessage}</strong>
+          </div>
+        )}
+
         <div className="integration-layout">
           <form
             key={dapicIntegration?.id ?? 'new-dapic'}
@@ -4066,7 +4083,7 @@ function SettingsView({
                 required
               />
             </label>
-            <button type="submit" disabled={!activeCompany}>
+            <button type="submit" disabled={!activeCompany || Boolean(dapicBusyMessage)}>
               Salvar configuracao
             </button>
           </form>
@@ -4096,22 +4113,22 @@ function SettingsView({
         </div>
 
         <div className="quick-actions integration-actions">
-          <button type="button" disabled={!dapicIntegration} onClick={() => dapicIntegration && onDapicTest(dapicIntegration)}>
+          <button type="button" disabled={!dapicIntegration || Boolean(dapicBusyMessage)} onClick={() => dapicIntegration && onDapicTest(dapicIntegration)}>
             Testar conexao
           </button>
-          <button type="button" disabled={!dapicIntegration} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'employees')}>
+          <button type="button" disabled={!dapicIntegration || Boolean(dapicBusyMessage)} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'employees')}>
             Sincronizar funcionarios
           </button>
-          <button type="button" disabled={!dapicIntegration} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'products')}>
+          <button type="button" disabled={!dapicIntegration || Boolean(dapicBusyMessage)} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'products')}>
             Sincronizar produtos
           </button>
-          <button type="button" disabled={!dapicIntegration} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'operations')}>
+          <button type="button" disabled={!dapicIntegration || Boolean(dapicBusyMessage)} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'operations')}>
             Sincronizar operacoes
           </button>
-          <button type="button" disabled={!dapicIntegration} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'cells')}>
+          <button type="button" disabled={!dapicIntegration || Boolean(dapicBusyMessage)} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'cells')}>
             Sincronizar celulas
           </button>
-          <button type="button" disabled={!dapicIntegration} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'orders')}>
+          <button type="button" disabled={!dapicIntegration || Boolean(dapicBusyMessage)} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'orders')}>
             Sincronizar ordens
           </button>
         </div>
