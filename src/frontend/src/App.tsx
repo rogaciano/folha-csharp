@@ -277,6 +277,37 @@ type StatutoryTable = {
   ranges: StatutoryTableRange[]
 }
 
+type ProductionRate = {
+  id: string
+  productionProductId: string | null
+  productReference: string | null
+  productDescription: string | null
+  productionOperationId: string | null
+  operationName: string | null
+  productionCellId: string | null
+  cellName: string | null
+  departmentId: string | null
+  departmentName: string | null
+  jobPositionId: string | null
+  jobPositionName: string | null
+  unitValue: number
+  minimumQuantity: number | null
+  maximumQuantity: number | null
+  status: string
+  notes: string | null
+}
+
+type ProductionRateTable = {
+  id: string
+  companyId: string
+  name: string
+  effectiveFrom: string
+  effectiveTo: string | null
+  status: string
+  notes: string | null
+  rates: ProductionRate[]
+}
+
 type SystemUser = {
   id: string
   companyId: string | null
@@ -414,6 +445,7 @@ function App() {
   const [payrollCalculations, setPayrollCalculations] = useState<PayrollCalculation[]>([])
   const [payrollCalculationDetail, setPayrollCalculationDetail] = useState<PayrollCalculationDetail | null>(null)
   const [statutoryTables, setStatutoryTables] = useState<StatutoryTable[]>([])
+  const [productionRateTables, setProductionRateTables] = useState<ProductionRateTable[]>([])
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [dapicIntegrations, setDapicIntegrations] = useState<DapicIntegration[]>([])
@@ -480,6 +512,7 @@ function App() {
         fixedPayrollEntriesResponse,
         payrollCalculationsResponse,
         statutoryTablesResponse,
+        productionRateTablesResponse,
       ] = await Promise.all([
           apiFetch('/companies'),
           apiFetch('/departments'),
@@ -491,6 +524,7 @@ function App() {
           apiFetch('/fixed-payroll-entries'),
           apiFetch('/payroll-calculations'),
           apiFetch('/statutory-tables'),
+          apiFetch('/production-rate-tables'),
         ])
 
       if (
@@ -503,7 +537,8 @@ function App() {
         payrollEntriesResponse.status === 401 ||
         fixedPayrollEntriesResponse.status === 401 ||
         payrollCalculationsResponse.status === 401 ||
-        statutoryTablesResponse.status === 401
+        statutoryTablesResponse.status === 401 ||
+        productionRateTablesResponse.status === 401
       ) {
         handleLogout()
         return
@@ -519,7 +554,8 @@ function App() {
         !payrollEntriesResponse.ok ||
         !fixedPayrollEntriesResponse.ok ||
         !payrollCalculationsResponse.ok ||
-        !statutoryTablesResponse.ok
+        !statutoryTablesResponse.ok ||
+        !productionRateTablesResponse.ok
       ) {
         throw new Error('Falha ao carregar cadastros')
       }
@@ -534,6 +570,7 @@ function App() {
       setFixedPayrollEntries(await fixedPayrollEntriesResponse.json())
       setPayrollCalculations(await payrollCalculationsResponse.json())
       setStatutoryTables(await statutoryTablesResponse.json())
+      setProductionRateTables(await productionRateTablesResponse.json())
       if (isAdmin(session.user.role)) {
         const [
           usersResponse,
@@ -649,6 +686,7 @@ function App() {
     setPayrollCalculations([])
     setPayrollCalculationDetail(null)
     setStatutoryTables([])
+    setProductionRateTables([])
     setSystemUsers([])
     setAuditLogs([])
     setDapicIntegrations([])
@@ -1148,6 +1186,67 @@ function App() {
     }
   }
 
+  async function handleProductionRateTableSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!activeCompany) return false
+
+    const form = event.currentTarget
+    const data = new FormData(form)
+    const rates = [1, 2, 3, 4, 5]
+      .map((index) => {
+        const unitValue = Number(data.get(`productionUnitValue${index}`) || 0)
+        const minimumQuantityValue = String(data.get(`productionMinimumQuantity${index}`) ?? '')
+        const maximumQuantityValue = String(data.get(`productionMaximumQuantity${index}`) ?? '')
+
+        return {
+          productionProductId: data.get(`productionProductId${index}`) || null,
+          productionOperationId: data.get(`productionOperationId${index}`) || null,
+          productionCellId: data.get(`productionCellId${index}`) || null,
+          departmentId: data.get(`productionDepartmentId${index}`) || null,
+          jobPositionId: data.get(`productionJobPositionId${index}`) || null,
+          unitValue,
+          minimumQuantity: minimumQuantityValue ? Number(minimumQuantityValue) : null,
+          maximumQuantity: maximumQuantityValue ? Number(maximumQuantityValue) : null,
+          notes: data.get(`productionRateNotes${index}`) || null,
+        }
+      })
+      .filter((rate) => rate.unitValue > 0)
+
+    if (rates.length === 0) {
+      showMessage('Informe pelo menos uma linha de valor para producao.', 'warning')
+      return false
+    }
+
+    try {
+      await postData('/production-rate-tables', {
+        companyId: activeCompany.id,
+        name: data.get('name'),
+        effectiveFrom: data.get('effectiveFrom'),
+        effectiveTo: data.get('effectiveTo') || null,
+        notes: data.get('notes') || null,
+        rates,
+      })
+      form.reset()
+      showMessage('Tabela de valores de producao cadastrada.')
+      setMessageModal('Tabela de valores de producao cadastrada com sucesso.')
+      return true
+    } catch {
+      showMessage('Nao foi possivel cadastrar a tabela de valores de producao.')
+      return false
+    }
+  }
+
+  async function handleToggleProductionRateTableStatus(table: ProductionRateTable) {
+    const action = table.status === 'Active' ? 'deactivate' : 'activate'
+
+    try {
+      await postAction(`/production-rate-tables/${table.id}/${action}`)
+      showMessage(table.status === 'Active' ? 'Tabela de producao inativada.' : 'Tabela de producao ativada.')
+    } catch {
+      showMessage('Nao foi possivel alterar o status da tabela de producao.')
+    }
+  }
+
   async function handleUserSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = event.currentTarget
@@ -1578,6 +1677,7 @@ function App() {
             activeCompany={activeCompany}
             companies={companies}
             statutoryTables={statutoryTables}
+            productionRateTables={productionRateTables}
             users={systemUsers}
             auditLogs={auditLogs}
             hrEmployees={employees}
@@ -1597,6 +1697,8 @@ function App() {
             onSubmit={handleStatutoryTableSubmit}
             onToggleStatus={handleToggleStatutoryTableStatus}
             onDuplicate={handleDuplicateStatutoryTable}
+            onProductionRateTableSubmit={handleProductionRateTableSubmit}
+            onProductionRateTableToggleStatus={handleToggleProductionRateTableStatus}
             onUserSubmit={handleUserSubmit}
             onUserUpdate={handleUserUpdate}
             onUserResetPassword={handleUserResetPassword}
@@ -4100,6 +4202,7 @@ function SettingsView({
   activeCompany,
   companies,
   statutoryTables,
+  productionRateTables,
   users,
   auditLogs,
   hrEmployees,
@@ -4119,6 +4222,8 @@ function SettingsView({
   onSubmit,
   onToggleStatus,
   onDuplicate,
+  onProductionRateTableSubmit,
+  onProductionRateTableToggleStatus,
   onUserSubmit,
   onUserUpdate,
   onUserResetPassword,
@@ -4136,6 +4241,7 @@ function SettingsView({
   activeCompany: Company | undefined
   companies: Company[]
   statutoryTables: StatutoryTable[]
+  productionRateTables: ProductionRateTable[]
   users: SystemUser[]
   auditLogs: AuditLog[]
   hrEmployees: Employee[]
@@ -4155,6 +4261,8 @@ function SettingsView({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onToggleStatus: (table: StatutoryTable) => void
   onDuplicate: (table: StatutoryTable) => void
+  onProductionRateTableSubmit: (event: FormEvent<HTMLFormElement>) => Promise<boolean>
+  onProductionRateTableToggleStatus: (table: ProductionRateTable) => void
   onUserSubmit: (event: FormEvent<HTMLFormElement>) => void
   onUserUpdate: (user: SystemUser, event: FormEvent<HTMLFormElement>) => void
   onUserResetPassword: (user: SystemUser, event: FormEvent<HTMLFormElement>) => void
@@ -4170,6 +4278,7 @@ function SettingsView({
   onDapicOrderEndDateChange: (value: string) => void
 }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isProductionRateModalOpen, setIsProductionRateModalOpen] = useState(false)
   const [isUserModalOpen, setIsUserModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null)
   const [resetPasswordUser, setResetPasswordUser] = useState<SystemUser | null>(null)
@@ -4183,6 +4292,13 @@ function SettingsView({
     setIsCreateModalOpen(false)
   }
 
+  async function handleProductionRateSubmit(event: FormEvent<HTMLFormElement>) {
+    const saved = await onProductionRateTableSubmit(event)
+    if (saved) {
+      setIsProductionRateModalOpen(false)
+    }
+  }
+
   return (
     <>
       <section className="section-actions">
@@ -4191,6 +4307,9 @@ function SettingsView({
         </button>
         <button type="button" onClick={() => setIsCreateModalOpen(true)}>
           Nova tabela legal
+        </button>
+        <button type="button" onClick={() => setIsProductionRateModalOpen(true)}>
+          Nova tabela de producao
         </button>
       </section>
 
@@ -4430,6 +4549,21 @@ function SettingsView({
         </Modal>
       )}
 
+      {isProductionRateModalOpen && (
+        <Modal title="Nova tabela de producao" onClose={() => setIsProductionRateModalOpen(false)} size="wide">
+          <ProductionRateTableCreateForm
+            activeCompany={activeCompany}
+            products={dapicProducts}
+            operations={dapicOperations}
+            cells={dapicCells}
+            departments={departments}
+            jobPositions={jobPositions}
+            onCancel={() => setIsProductionRateModalOpen(false)}
+            onSubmit={handleProductionRateSubmit}
+          />
+        </Modal>
+      )}
+
       {isUserModalOpen && (
         <Modal title="Novo usuario" onClose={() => setIsUserModalOpen(false)}>
           <UserCreateForm
@@ -4513,6 +4647,19 @@ function SettingsView({
       />
 
       <DataTable
+        title="Tabelas de valores de producao"
+        columns={['Nome', 'Vigencia', 'Status', 'Regras', 'Acoes']}
+        pageSize={10}
+        rows={productionRateTables.map((table) => [
+          table.name,
+          `${formatDate(table.effectiveFrom)} ate ${table.effectiveTo ? formatDate(table.effectiveTo) : 'vigente'}`,
+          productionRateStatusBadge(table.status),
+          formatProductionRateRules(table.rates),
+          actionButton(table.status === 'Active' ? 'Inativar' : 'Ativar', () => onProductionRateTableToggleStatus(table)),
+        ])}
+      />
+
+      <DataTable
         title="Tabelas legais parametrizadas"
         columns={['Tipo', 'Nome', 'Vigencia', 'Faixas', 'Status', 'Acoes']}
         pageSize={10}
@@ -4531,6 +4678,125 @@ function SettingsView({
         ])}
       />
     </>
+  )
+}
+
+function ProductionRateTableCreateForm({
+  activeCompany,
+  products,
+  operations,
+  cells,
+  departments,
+  jobPositions,
+  onCancel,
+  onSubmit,
+}: {
+  activeCompany: Company | undefined
+  products: DapicProduct[]
+  operations: DapicNamedProduction[]
+  cells: DapicNamedProduction[]
+  departments: Department[]
+  jobPositions: JobPosition[]
+  onCancel: () => void
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void
+}) {
+  const productOptions = products
+    .slice()
+    .sort((first, second) => first.reference.localeCompare(second.reference))
+    .slice(0, 300)
+
+  return (
+    <form className="statutory-table-form" onSubmit={(event) => void onSubmit(event)}>
+      <label>
+        Nome
+        <input name="name" placeholder="Ex: Producao junho 2026" required />
+      </label>
+      <label>
+        Inicio vigencia
+        <input name="effectiveFrom" type="date" defaultValue={currentMonthStart()} required />
+      </label>
+      <label>
+        Fim vigencia
+        <input name="effectiveTo" type="date" />
+      </label>
+      <label className="span-2">
+        Observacao
+        <textarea name="notes" rows={3} placeholder="Ex: valores negociados por operacao e celula" />
+      </label>
+
+      <div className="rate-editor span-2">
+        <div className="rate-editor-header">
+          <span>Linha</span>
+          <span>Produto</span>
+          <span>Operacao</span>
+          <span>Celula</span>
+          <span>Setor</span>
+          <span>Cargo</span>
+          <span>Valor</span>
+          <span>Qtd min.</span>
+          <span>Qtd max.</span>
+          <span>Obs.</span>
+        </div>
+        {[1, 2, 3, 4, 5].map((index) => (
+          <div className="rate-editor-row" key={index}>
+            <strong>{index}</strong>
+            <select name={`productionProductId${index}`} defaultValue="">
+              <option value="">Todos</option>
+              {productOptions.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.reference} - {product.factoryDescription}
+                </option>
+              ))}
+            </select>
+            <select name={`productionOperationId${index}`} defaultValue="">
+              <option value="">Todas</option>
+              {operations.map((operation) => (
+                <option key={operation.id} value={operation.id}>
+                  {operation.name}
+                </option>
+              ))}
+            </select>
+            <select name={`productionCellId${index}`} defaultValue="">
+              <option value="">Todas</option>
+              {cells.map((cell) => (
+                <option key={cell.id} value={cell.id}>
+                  {cell.name}
+                </option>
+              ))}
+            </select>
+            <select name={`productionDepartmentId${index}`} defaultValue="">
+              <option value="">Todos</option>
+              {departments.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+            <select name={`productionJobPositionId${index}`} defaultValue="">
+              <option value="">Todos</option>
+              {jobPositions.map((jobPosition) => (
+                <option key={jobPosition.id} value={jobPosition.id}>
+                  {jobPosition.name}
+                </option>
+              ))}
+            </select>
+            <input name={`productionUnitValue${index}`} type="number" min="0" step="0.01" placeholder="0,00" />
+            <input name={`productionMinimumQuantity${index}`} type="number" min="0" step="0.0001" />
+            <input name={`productionMaximumQuantity${index}`} type="number" min="0" step="0.0001" />
+            <input name={`productionRateNotes${index}`} placeholder="Opcional" />
+          </div>
+        ))}
+      </div>
+
+      <div className="modal-actions">
+        <button type="button" onClick={onCancel}>
+          Cancelar
+        </button>
+        <button type="submit" disabled={!activeCompany}>
+          Salvar tabela
+        </button>
+      </div>
+    </form>
   )
 }
 
@@ -5772,6 +6038,9 @@ function labelAuditAction(value: string) {
     'statutory_table.duplicate': 'Criou nova vigencia',
     'statutory_table.activate': 'Reativou tabela legal',
     'statutory_table.deactivate': 'Inativou tabela legal',
+    'production_rate_table.create': 'Criou tabela de producao',
+    'production_rate_table.activate': 'Ativou tabela de producao',
+    'production_rate_table.deactivate': 'Inativou tabela de producao',
     'dapic.employee_link': 'Vinculou funcionario Dapic',
     'dapic.employee_ignore': 'Ignorou funcionario Dapic',
     'dapic.employee_reset_link': 'Redefiniu funcionario Dapic',
@@ -5940,6 +6209,26 @@ function formatStatutoryRanges(ranges: StatutoryTableRange[]) {
     .join(' | ')
 }
 
+function formatProductionRateRules(rates: ProductionRate[]) {
+  if (rates.length === 0) return '-'
+
+  return rates
+    .slice(0, 3)
+    .map((rate) => {
+      const criteria = [
+        rate.productReference,
+        rate.operationName,
+        rate.cellName,
+        rate.departmentName,
+        rate.jobPositionName,
+      ].filter(Boolean)
+
+      return `${criteria.length > 0 ? criteria.join(' / ') : 'Regra geral'}: ${formatCurrency(rate.unitValue)}`
+    })
+    .concat(rates.length > 3 ? [`+${rates.length - 3} regra(s)`] : [])
+    .join(' | ')
+}
+
 function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', {
     style: 'currency',
@@ -5981,6 +6270,12 @@ function statusBadge(value: string) {
 
 function activeBadge(isActive: boolean) {
   return <span className={`status-badge ${isActive ? 'status-active' : 'status-inactive'}`}>{isActive ? 'Ativo' : 'Inativo'}</span>
+}
+
+function productionRateStatusBadge(value: string) {
+  const label = value === 'Active' ? 'Ativa' : value === 'Inactive' ? 'Inativa' : 'Rascunho'
+  const statusClass = value === 'Active' ? 'status-active' : value === 'Inactive' ? 'status-inactive' : 'status-warning'
+  return <span className={`status-badge ${statusClass}`}>{label}</span>
 }
 
 function originBadge(origin: 'manual' | 'dapic') {

@@ -43,4 +43,43 @@ public sealed class ProductionRate : Entity
     public string Status { get; private set; }
     public string? Notes { get; private set; }
     public DateTime? DeletedAt { get; private set; }
+
+    public void ConfigureCriteria(
+        Guid? productionProductId,
+        Guid? productionOperationId,
+        Guid? productionCellId,
+        Guid? departmentId,
+        Guid? jobPositionId,
+        decimal? minimumQuantity,
+        decimal? maximumQuantity,
+        string? notes)
+    {
+        ProductionProductId = productionProductId;
+        ProductionOperationId = productionOperationId;
+        ProductionCellId = productionCellId;
+        DepartmentId = departmentId;
+        JobPositionId = jobPositionId;
+        MinimumQuantity = minimumQuantity;
+        MaximumQuantity = maximumQuantity;
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateValue(decimal unitValue)
+    {
+        UnitValue = unitValue;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Activate()
+    {
+        Status = "Active";
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Deactivate()
+    {
+        Status = "Inactive";
+        UpdatedAt = DateTime.UtcNow;
+    }
 }

@@ -29,4 +29,25 @@ public sealed class ProductionRateTable : Entity
     public string? Notes { get; private set; }
     public DateTime? DeletedAt { get; private set; }
     public ICollection<ProductionRate> Rates { get; private set; } = [];
+
+    public void Update(string name, DateOnly effectiveFrom, DateOnly? effectiveTo, string? notes)
+    {
+        Name = name.Trim();
+        EffectiveFrom = effectiveFrom;
+        EffectiveTo = effectiveTo;
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Activate()
+    {
+        Status = "Active";
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Deactivate()
+    {
+        Status = "Inactive";
+        UpdatedAt = DateTime.UtcNow;
+    }
 }
