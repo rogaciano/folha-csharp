@@ -96,6 +96,16 @@ public sealed class DapicClient(HttpClient httpClient)
         return GetPagedAsync<DapicNamedEntityDto>(baseUrl, accessToken, $"/v1/celulasproducao?Pagina={page}&RegistrosPorPagina={pageSize}", cancellationToken);
     }
 
+    public Task<DapicPagedResult<DapicProductionOrderDto>> GetProductionOrdersAsync(
+        string baseUrl,
+        string accessToken,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        return GetPagedAsync<DapicProductionOrderDto>(baseUrl, accessToken, $"/v1/ordensproducao?Pagina={page}&RegistrosPorPagina={pageSize}", cancellationToken);
+    }
+
     private async Task<DapicPagedResult<T>> GetPagedAsync<T>(
         string baseUrl,
         string accessToken,
@@ -171,3 +181,19 @@ public sealed record DapicNamedEntityDto(
     string? Nome,
     string? Descricao,
     string? Status);
+
+public sealed record DapicProductionOrderDto(
+    long Id,
+    string? Numero,
+    string? Codigo,
+    string? Lote,
+    string? Descricao,
+    string? Observacao,
+    string? Status,
+    DateTime? DataConta,
+    DateTime? DataCadastro,
+    DateTime? DataInicio,
+    DateTime? DataPrevisao,
+    DateTime? DataFim,
+    DateTime? DataFinalizacao,
+    DateTime? DataModificacao);

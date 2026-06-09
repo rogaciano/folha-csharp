@@ -358,6 +358,20 @@ type DapicNamedProduction = {
   lastSyncedAt: string
 }
 
+type DapicProductionOrder = {
+  id: string
+  companyId: string
+  externalId: string
+  number: string | null
+  description: string | null
+  status: string
+  rawStatus: string | null
+  issueDate: string | null
+  startDate: string | null
+  endDate: string | null
+  lastSyncedAt: string
+}
+
 type LoadState = 'loading' | 'ready' | 'error'
 type FeedbackType = 'success' | 'error' | 'warning'
 
@@ -389,6 +403,7 @@ function App() {
   const [dapicProducts, setDapicProducts] = useState<DapicProduct[]>([])
   const [dapicOperations, setDapicOperations] = useState<DapicNamedProduction[]>([])
   const [dapicCells, setDapicCells] = useState<DapicNamedProduction[]>([])
+  const [dapicOrders, setDapicOrders] = useState<DapicProductionOrder[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [message, setMessage] = useState<FeedbackMessage | null>(null)
   const [messageModal, setMessageModal] = useState('')
@@ -506,6 +521,7 @@ function App() {
           dapicProductsResponse,
           dapicOperationsResponse,
           dapicCellsResponse,
+          dapicOrdersResponse,
         ] = await Promise.all([
           apiFetch('/users'),
           apiFetch('/audit-logs'),
@@ -514,6 +530,7 @@ function App() {
           apiFetch('/integrations/dapic/products'),
           apiFetch('/integrations/dapic/operations'),
           apiFetch('/integrations/dapic/cells'),
+          apiFetch('/integrations/dapic/orders'),
         ])
 
         if (
@@ -523,7 +540,8 @@ function App() {
           !dapicEmployeesResponse.ok ||
           !dapicProductsResponse.ok ||
           !dapicOperationsResponse.ok ||
-          !dapicCellsResponse.ok
+          !dapicCellsResponse.ok ||
+          !dapicOrdersResponse.ok
         ) {
           throw new Error('Falha ao carregar configuracoes administrativas')
         }
@@ -536,6 +554,7 @@ function App() {
         setDapicProducts(await dapicProductsResponse.json())
         setDapicOperations(await dapicOperationsResponse.json())
         setDapicCells(await dapicCellsResponse.json())
+        setDapicOrders(await dapicOrdersResponse.json())
 
         if (integrations[0]) {
           const dapicLogsResponse = await apiFetch(`/integrations/dapic/${integrations[0].id}/logs`)
@@ -555,6 +574,7 @@ function App() {
         setDapicProducts([])
         setDapicOperations([])
         setDapicCells([])
+        setDapicOrders([])
       }
       setLoadState('ready')
     } catch {
@@ -615,6 +635,7 @@ function App() {
     setDapicProducts([])
     setDapicOperations([])
     setDapicCells([])
+    setDapicOrders([])
     setLoadState('loading')
   }
 
@@ -1432,6 +1453,7 @@ function App() {
             dapicProducts={dapicProducts}
             dapicOperations={dapicOperations}
             dapicCells={dapicCells}
+            dapicOrders={dapicOrders}
             currentUser={session.user}
             onSubmit={handleStatutoryTableSubmit}
             onToggleStatus={handleToggleStatutoryTableStatus}
@@ -3941,6 +3963,7 @@ function SettingsView({
   dapicProducts,
   dapicOperations,
   dapicCells,
+  dapicOrders,
   currentUser,
   onSubmit,
   onToggleStatus,
@@ -3964,6 +3987,7 @@ function SettingsView({
   dapicProducts: DapicProduct[]
   dapicOperations: DapicNamedProduction[]
   dapicCells: DapicNamedProduction[]
+  dapicOrders: DapicProductionOrder[]
   currentUser: AuthUser
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onToggleStatus: (table: StatutoryTable) => void
@@ -4087,6 +4111,9 @@ function SettingsView({
           <button type="button" disabled={!dapicIntegration} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'cells')}>
             Sincronizar celulas
           </button>
+          <button type="button" disabled={!dapicIntegration} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'orders')}>
+            Sincronizar ordens
+          </button>
         </div>
       </Panel>
 
@@ -4095,6 +4122,7 @@ function SettingsView({
         <Metric label="Dapic produtos" value={dapicProducts.length} />
         <Metric label="Dapic operacoes" value={dapicOperations.length} />
         <Metric label="Dapic celulas" value={dapicCells.length} />
+        <Metric label="Dapic ordens" value={dapicOrders.length} />
       </section>
 
       <DataTable
@@ -4154,6 +4182,21 @@ function SettingsView({
             formatDateTime(cell.lastSyncedAt),
           ]),
         ]}
+      />
+
+      <DataTable
+        title="Ordens de producao Dapic"
+        columns={['ID externo', 'Numero', 'Descricao', 'Status', 'Data conta', 'Inicio', 'Fim', 'Sincronizado em']}
+        rows={dapicOrders.slice(0, 50).map((order) => [
+          order.externalId,
+          order.number ?? '-',
+          order.description ?? '-',
+          labelDapicStatus(order.status),
+          order.issueDate ? formatDate(order.issueDate) : '-',
+          order.startDate ? formatDate(order.startDate) : '-',
+          order.endDate ? formatDate(order.endDate) : '-',
+          formatDateTime(order.lastSyncedAt),
+        ])}
       />
 
       {isCreateModalOpen && (
@@ -5027,6 +5070,10 @@ function labelDapicResource(value: string) {
     operacoes: 'Operacoes',
     cells: 'Celulas',
     celulas: 'Celulas',
+    orders: 'Ordens de producao',
+    ordens: 'Ordens de producao',
+    ordensproducao: 'Ordens de producao',
+    productionorders: 'Ordens de producao',
   }
 
   return labels[value.toLowerCase()] ?? value
@@ -5042,6 +5089,10 @@ function labelDapicStatus(value: string) {
     completed: 'Concluida',
     failed: 'Falha',
     unknown: 'Nao informado',
+    waitingstart: 'Aguardando inicio',
+    inproduction: 'Em producao',
+    finished: 'Finalizada',
+    canceled: 'Cancelada',
   }
 
   return labels[value.toLowerCase()] ?? value

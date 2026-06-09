@@ -141,6 +141,7 @@ public sealed class DapicIntegrationsController(
                 "products" or "produtos" => await syncService.SyncProductsAsync(integration, userId, cancellationToken),
                 "operations" or "operacoes" => await syncService.SyncOperationsAsync(integration, userId, cancellationToken),
                 "cells" or "celulas" => await syncService.SyncCellsAsync(integration, userId, cancellationToken),
+                "orders" or "ordens" or "ordensproducao" => await syncService.SyncProductionOrdersAsync(integration, userId, cancellationToken),
                 _ => throw new InvalidOperationException("Recurso de sincronizacao nao suportado.")
             };
 
@@ -258,6 +259,31 @@ public sealed class DapicIntegrationsController(
         return Ok(cells);
     }
 
+    [HttpGet("orders")]
+    public async Task<IActionResult> GetOrders(CancellationToken cancellationToken)
+    {
+        var orders = await dbContext.ProductionOrders
+            .AsNoTracking()
+            .OrderByDescending(order => order.IssueDate)
+            .ThenBy(order => order.Number)
+            .Select(order => new DapicProductionOrderResponse(
+                order.Id,
+                order.CompanyId,
+                order.ExternalId,
+                order.Number,
+                order.Description,
+                order.Status,
+                order.RawStatus,
+                order.IssueDate,
+                order.StartDate,
+                order.EndDate,
+                order.LastSyncedAt))
+            .Take(100)
+            .ToListAsync(cancellationToken);
+
+        return Ok(orders);
+    }
+
     private Guid? GetCurrentUserId()
     {
         var value = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -328,4 +354,17 @@ public sealed record DapicNamedProductionResponse(
     string Name,
     string? Description,
     string Status,
+    DateTime LastSyncedAt);
+
+public sealed record DapicProductionOrderResponse(
+    Guid Id,
+    Guid CompanyId,
+    string ExternalId,
+    string? Number,
+    string? Description,
+    string Status,
+    string? RawStatus,
+    DateOnly? IssueDate,
+    DateOnly? StartDate,
+    DateOnly? EndDate,
     DateTime LastSyncedAt);

@@ -111,6 +111,52 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
             cancellationToken);
     }
 
+    public async Task<DapicSyncResult> SyncProductionOrdersAsync(ExternalIntegration integration, Guid? userId, CancellationToken cancellationToken)
+    {
+        return await SyncPagedAsync(
+            integration,
+            "ProductionOrders",
+            userId,
+            (page, token) => dapicClient.GetProductionOrdersAsync(integration.BaseUrl, token, page, PageSize, cancellationToken),
+            async items =>
+            {
+                var created = 0;
+                var updated = 0;
+                var externalIds = items.Select(item => item.Id.ToString()).ToList();
+                var existing = await dbContext.ProductionOrders
+                    .Where(order => order.CompanyId == integration.CompanyId && externalIds.Contains(order.ExternalId))
+                    .ToDictionaryAsync(order => order.ExternalId, cancellationToken);
+
+                foreach (var item in items)
+                {
+                    var externalId = item.Id.ToString();
+                    var number = FirstNotEmpty(item.Numero, item.Codigo, item.Lote, externalId);
+                    var description = FirstNotEmpty(item.Descricao, item.Observacao, number);
+                    var status = FirstNotEmpty(item.Status, "Unknown");
+                    var issueDate = ToDateOnly(item.DataConta ?? item.DataCadastro);
+                    var startDate = ToDateOnly(item.DataInicio);
+                    var endDate = ToDateOnly(item.DataFim ?? item.DataFinalizacao ?? item.DataPrevisao);
+                    var externalUpdatedAt = item.DataModificacao ?? item.DataCadastro;
+
+                    if (existing.TryGetValue(externalId, out var order))
+                    {
+                        order.UpdateFromSync(number, description, status, issueDate, startDate, endDate, externalUpdatedAt);
+                        updated += 1;
+                    }
+                    else
+                    {
+                        var newOrder = new ProductionOrder(integration.CompanyId, externalId, number, description);
+                        newOrder.UpdateFromSync(number, description, status, issueDate, startDate, endDate, externalUpdatedAt);
+                        dbContext.ProductionOrders.Add(newOrder);
+                        created += 1;
+                    }
+                }
+
+                return (created, updated);
+            },
+            cancellationToken);
+    }
+
     private async Task<DapicSyncResult> SyncNamedEntitiesAsync(
         ExternalIntegration integration,
         string resource,
@@ -259,6 +305,11 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
     private static string FirstNotEmpty(params string?[] values)
     {
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
+    }
+
+    private static DateOnly? ToDateOnly(DateTime? value)
+    {
+        return value.HasValue ? DateOnly.FromDateTime(value.Value) : null;
     }
 }
 
