@@ -4509,6 +4509,7 @@ function DapicConferencePanel({
   const [page, setPage] = useState(1)
   const [linkingEmployee, setLinkingEmployee] = useState<DapicEmployee | null>(null)
   const pageSize = 15
+  const employeeSuggestions = useMemo(() => buildDapicEmployeeSuggestions(dapicEmployees, employees), [dapicEmployees, employees])
   const tabs: Array<{ id: DapicConferenceTab; label: string; count: number }> = [
     { id: 'employees', label: 'Funcionarios', count: dapicEmployees.length },
     { id: 'products', label: 'Produtos', count: products.length },
@@ -4519,7 +4520,7 @@ function DapicConferencePanel({
   const current = buildDapicConferenceRows(
     activeTab,
     { employees: dapicEmployees, products, operations, cells, orders },
-    { onEmployeeLink: setLinkingEmployee, onEmployeeIgnore, onEmployeeReset },
+    { employeeSuggestions, onEmployeeLink: setLinkingEmployee, onEmployeeSuggestionLink: onEmployeeLink, onEmployeeIgnore, onEmployeeReset },
   )
   const statuses = Array.from(new Set(current.records.map((record) => record.status).filter(Boolean))).sort((left, right) =>
     labelDapicStatus(left).localeCompare(labelDapicStatus(right), 'pt-BR'),
@@ -4673,39 +4674,45 @@ function buildDapicConferenceRows(
     orders: DapicProductionOrder[]
   },
   actions: {
+    employeeSuggestions: Map<string, Employee[]>
     onEmployeeLink: (employee: DapicEmployee) => void
+    onEmployeeSuggestionLink: (dapicEmployee: DapicEmployee, employeeId: string) => void
     onEmployeeIgnore: (employee: DapicEmployee) => void
     onEmployeeReset: (employee: DapicEmployee) => void
   },
 ) {
   if (tab === 'employees') {
     return {
-      columns: ['Origem', 'Nome', 'Acoes', 'Situacao', 'Colaborador vinculado', 'Fantasia', 'Exibicao', 'Status', 'Ultima sincronizacao'],
-      records: data.employees.map((employee) => ({
-        key: employee.id,
-        status: employee.linkStatus,
-        searchText: [
-          employee.externalId,
-          employee.name,
-          employee.fantasyName,
-          employee.displayName,
-          employee.status,
-          employee.linkStatus,
-          employee.employeeRegistration,
-          employee.employeeName,
-        ].join(' '),
-        cells: [
-          originBadge('dapic'),
-          employee.name,
-          dapicEmployeeActions(employee, actions.onEmployeeLink, actions.onEmployeeIgnore, actions.onEmployeeReset),
-          dapicLinkStatusBadge(employee.linkStatus),
-          employee.employeeName ? `${employee.employeeRegistration ?? '-'} - ${employee.employeeName}` : '-',
-          employee.fantasyName ?? '-',
-          employee.displayName ?? '-',
-          dapicStatusBadge(employee.status),
-          formatDateTime(employee.lastSyncedAt),
-        ],
-      })),
+      columns: ['Origem', 'Nome', 'Acoes', 'Situacao', 'Sugestao', 'Colaborador vinculado', 'Exibicao', 'Status', 'Ultima sincronizacao'],
+      records: data.employees.map((employee) => {
+        const suggestions = actions.employeeSuggestions.get(employee.id) ?? []
+        return {
+          key: employee.id,
+          status: employee.linkStatus,
+          searchText: [
+            employee.externalId,
+            employee.name,
+            employee.fantasyName,
+            employee.displayName,
+            employee.status,
+            employee.linkStatus,
+            employee.employeeRegistration,
+            employee.employeeName,
+            ...suggestions.map((suggestion) => `${suggestion.registration} ${suggestion.name}`),
+          ].join(' '),
+          cells: [
+            originBadge('dapic'),
+            employee.name,
+            dapicEmployeeActions(employee, suggestions, actions.onEmployeeLink, actions.onEmployeeSuggestionLink, actions.onEmployeeIgnore, actions.onEmployeeReset),
+            dapicLinkStatusBadge(employee.linkStatus),
+            formatDapicEmployeeSuggestion(suggestions),
+            employee.employeeName ? `${employee.employeeRegistration ?? '-'} - ${employee.employeeName}` : '-',
+            employee.displayName ?? employee.fantasyName ?? '-',
+            dapicStatusBadge(employee.status),
+            formatDateTime(employee.lastSyncedAt),
+          ],
+        }
+      }),
     }
   }
 
@@ -4785,17 +4792,79 @@ function buildDapicConferenceRows(
 
 function dapicEmployeeActions(
   employee: DapicEmployee,
+  suggestions: Employee[],
   onLink: (employee: DapicEmployee) => void,
+  onSuggestionLink: (dapicEmployee: DapicEmployee, employeeId: string) => void,
   onIgnore: (employee: DapicEmployee) => void,
   onReset: (employee: DapicEmployee) => void,
 ) {
+  const singleSuggestion = suggestions.length === 1 ? suggestions[0] : null
+
   return (
     <div className="table-actions">
+      {employee.linkStatus !== 'vinculado' &&
+        singleSuggestion &&
+        actionButton('Vincular sugestao', () => onSuggestionLink(employee, singleSuggestion.id))}
       {actionButton(employee.linkStatus === 'vinculado' ? 'Alterar vinculo' : 'Vincular', () => onLink(employee))}
       {employee.linkStatus !== 'ignorado' && actionButton('Ignorar', () => onIgnore(employee))}
       {employee.linkStatus !== 'pendente' && actionButton('Redefinir', () => onReset(employee))}
     </div>
   )
+}
+
+function formatDapicEmployeeSuggestion(suggestions: Employee[]) {
+  if (suggestions.length === 0) {
+    return '-'
+  }
+
+  if (suggestions.length === 1) {
+    const suggestion = suggestions[0]
+    return `${suggestion.registration} - ${suggestion.name}`
+  }
+
+  return `${suggestions.length} possiveis vinculos`
+}
+
+function buildDapicEmployeeSuggestions(dapicEmployees: DapicEmployee[], employees: Employee[]) {
+  const employeesByNormalizedName = employees.reduce((map, employee) => {
+    const normalized = normalizePersonName(employee.name)
+    if (!normalized) return map
+
+    const list = map.get(normalized) ?? []
+    list.push(employee)
+    map.set(normalized, list)
+    return map
+  }, new Map<string, Employee[]>())
+
+  return dapicEmployees.reduce((map, dapicEmployee) => {
+    if (dapicEmployee.linkStatus !== 'pendente') {
+      map.set(dapicEmployee.id, [])
+      return map
+    }
+
+    const candidates = [
+      ...findEmployeesByDapicName(dapicEmployee.name, employeesByNormalizedName),
+      ...findEmployeesByDapicName(dapicEmployee.displayName, employeesByNormalizedName),
+      ...findEmployeesByDapicName(dapicEmployee.fantasyName, employeesByNormalizedName),
+    ]
+    const uniqueCandidates = Array.from(new Map(candidates.map((candidate) => [candidate.id, candidate])).values())
+
+    map.set(dapicEmployee.id, uniqueCandidates)
+    return map
+  }, new Map<string, Employee[]>())
+}
+
+function findEmployeesByDapicName(value: string | null, employeesByNormalizedName: Map<string, Employee[]>) {
+  if (!value) return []
+
+  return employeesByNormalizedName.get(normalizePersonName(value)) ?? []
+}
+
+function normalizePersonName(value: string) {
+  return normalizeSearch(value)
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function DapicEmployeeLinkForm({

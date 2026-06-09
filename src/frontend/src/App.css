@@ -593,6 +593,10 @@ th {
   min-width: 92px;
 }
 
+.dapic-conference .table-action:first-child {
+  background: #256f5c;
+}
+
 .dapic-conference-header {
   display: flex;
   align-items: flex-start;
