@@ -122,6 +122,8 @@ textarea {
   display: grid;
   gap: 20px;
   align-content: start;
+  min-width: 0;
+  max-width: 100%;
   padding: 28px;
 }
 
@@ -193,12 +195,14 @@ button:disabled {
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  min-width: 0;
   gap: 12px;
 }
 
 .metric,
 .panel {
+  min-width: 0;
   border: 1px solid #d8dee6;
   border-radius: 8px;
   background: #ffffff;
@@ -226,6 +230,7 @@ button:disabled {
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
   gap: 20px;
 }
 
@@ -327,6 +332,7 @@ input[type='checkbox'] {
 }
 
 .table-scroll {
+  max-width: 100%;
   overflow-x: auto;
 }
 
@@ -481,8 +487,21 @@ th {
 
 .integration-layout {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
+}
+
+.dapic-integration-panel {
+  overflow: hidden;
+}
+
+.dapic-integration-panel .entry-form {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dapic-integration-panel .entry-form label,
+.dapic-integration-panel .entry-form button {
+  min-width: 0;
 }
 
 .integration-progress {
@@ -515,6 +534,7 @@ th {
 
 .integration-summary {
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -550,7 +570,7 @@ th {
 
 .integration-order-sync {
   display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 240px)) auto minmax(220px, 1fr);
+  grid-template-columns: repeat(2, minmax(160px, 220px)) minmax(180px, auto) minmax(0, 1fr);
   align-items: end;
   gap: 12px;
   border-top: 1px solid #e3e8ef;
@@ -567,6 +587,7 @@ th {
 .dapic-conference {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .dapic-conference .table-scroll {
@@ -1307,7 +1328,12 @@ th {
   .statutory-table-form,
   .integration-layout,
   .integration-order-sync,
+  .integration-summary,
   .check-group {
+    grid-template-columns: 1fr;
+  }
+
+  .dapic-integration-panel .entry-form {
     grid-template-columns: 1fr;
   }
 

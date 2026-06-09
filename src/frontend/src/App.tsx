@@ -4324,7 +4324,7 @@ function SettingsView({
         </div>
       </Panel>
 
-      <Panel title="Integracao Dapic">
+      <Panel title="Integracao Dapic" className="dapic-integration-panel">
         {dapicBusyMessage && (
           <div className="integration-progress" role="status" aria-live="polite">
             <span className="loading-spinner" />
@@ -5482,9 +5482,9 @@ function Metric({ label, value }: { label: string; value: string | number }) {
   )
 }
 
-function Panel({ title, children }: { title: string; children: ReactNode }) {
+function Panel({ title, children, className = '' }: { title: string; children: ReactNode; className?: string }) {
   return (
-    <section className="panel">
+    <section className={`panel ${className}`.trim()}>
       <h3>{title}</h3>
       {children}
     </section>
