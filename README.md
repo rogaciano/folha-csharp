@@ -59,6 +59,8 @@ GET /api/health
 - Plano de implementacao: [`docs/plano-implementacao.md`](docs/plano-implementacao.md)
 - Deploy em VPS sem Docker: [`deploy/vps/README.md`](deploy/vps/README.md)
 - Pos-mortem do primeiro deploy: [`docs/pos-mortem-deploy-vps.md`](docs/pos-mortem-deploy-vps.md)
+- Integracao Dapic/producao: [`docs/integracao-dapic-producao.md`](docs/integracao-dapic-producao.md)
+- Modelo de dados producao/Dapic: [`docs/modelo-dados-producao-dapic.md`](docs/modelo-dados-producao-dapic.md)
 
 Criar migration:
 
