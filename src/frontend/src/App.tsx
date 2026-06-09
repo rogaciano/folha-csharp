@@ -380,6 +380,17 @@ type DapicProductionOrder = {
 }
 
 type DapicConferenceTab = 'employees' | 'products' | 'operations' | 'cells' | 'orders'
+type CreateLinkedEmployeePayload = {
+  departmentId: string
+  jobPositionId: string
+  registration: string
+  name: string
+  documentNumber: string
+  admissionDate: string
+  compensationModel: string
+  baseSalary: number
+  productionUnitValue: number
+}
 type LoadState = 'loading' | 'ready' | 'error'
 type FeedbackType = 'success' | 'error' | 'warning'
 
@@ -1338,6 +1349,52 @@ function App() {
     }
   }
 
+  async function handleDapicEmployeeCreateAndLink(dapicEmployee: DapicEmployee, payload: CreateLinkedEmployeePayload) {
+    if (!activeCompany) return
+
+    try {
+      const createResponse = await apiFetch('/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: activeCompany.id,
+          departmentId: payload.departmentId,
+          jobPositionId: payload.jobPositionId,
+          registration: payload.registration,
+          name: payload.name,
+          documentNumber: payload.documentNumber,
+          admissionDate: payload.admissionDate,
+          compensationModel: payload.compensationModel,
+          baseSalary: payload.baseSalary,
+          productionUnitValue: payload.productionUnitValue,
+          responsibleEmployeeId: null,
+          photoUrl: null,
+        }),
+      })
+
+      if (!createResponse.ok) {
+        throw new Error('Nao foi possivel cadastrar o colaborador')
+      }
+
+      const employee = (await createResponse.json()) as Employee
+      const linkResponse = await apiFetch(`/integrations/dapic/employees/${dapicEmployee.id}/link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId: employee.id }),
+      })
+
+      if (!linkResponse.ok) {
+        throw new Error('Nao foi possivel vincular o colaborador criado')
+      }
+
+      await loadData()
+      showMessage('Colaborador cadastrado e vinculado ao funcionario Dapic.')
+      setMessageModal('Colaborador cadastrado e vinculado ao funcionario Dapic com sucesso.')
+    } catch {
+      showMessage('Nao foi possivel cadastrar e vincular o funcionario Dapic.')
+    }
+  }
+
   if (!session) {
     return <LoginView message={loginMessage} onSubmit={handleLoginSubmit} />
   }
@@ -1524,6 +1581,8 @@ function App() {
             users={systemUsers}
             auditLogs={auditLogs}
             hrEmployees={employees}
+            departments={departments}
+            jobPositions={jobPositions}
             dapicIntegrations={dapicIntegrations}
             dapicLogs={dapicLogs}
             dapicEmployees={dapicEmployees}
@@ -1548,6 +1607,7 @@ function App() {
             onDapicEmployeeLink={handleDapicEmployeeLink}
             onDapicEmployeeIgnore={handleDapicEmployeeIgnore}
             onDapicEmployeeReset={handleDapicEmployeeReset}
+            onDapicEmployeeCreateAndLink={handleDapicEmployeeCreateAndLink}
             onDapicOrderStartDateChange={setDapicOrderStartDate}
             onDapicOrderEndDateChange={setDapicOrderEndDate}
           />
@@ -4043,6 +4103,8 @@ function SettingsView({
   users,
   auditLogs,
   hrEmployees,
+  departments,
+  jobPositions,
   dapicIntegrations,
   dapicLogs,
   dapicEmployees,
@@ -4067,6 +4129,7 @@ function SettingsView({
   onDapicEmployeeLink,
   onDapicEmployeeIgnore,
   onDapicEmployeeReset,
+  onDapicEmployeeCreateAndLink,
   onDapicOrderStartDateChange,
   onDapicOrderEndDateChange,
 }: {
@@ -4076,6 +4139,8 @@ function SettingsView({
   users: SystemUser[]
   auditLogs: AuditLog[]
   hrEmployees: Employee[]
+  departments: Department[]
+  jobPositions: JobPosition[]
   dapicIntegrations: DapicIntegration[]
   dapicLogs: DapicSyncLog[]
   dapicEmployees: DapicEmployee[]
@@ -4100,6 +4165,7 @@ function SettingsView({
   onDapicEmployeeLink: (dapicEmployee: DapicEmployee, employeeId: string) => void
   onDapicEmployeeIgnore: (dapicEmployee: DapicEmployee) => void
   onDapicEmployeeReset: (dapicEmployee: DapicEmployee) => void
+  onDapicEmployeeCreateAndLink: (dapicEmployee: DapicEmployee, payload: CreateLinkedEmployeePayload) => void
   onDapicOrderStartDateChange: (value: string) => void
   onDapicOrderEndDateChange: (value: string) => void
 }) {
@@ -4267,6 +4333,8 @@ function SettingsView({
         search={dapicConferenceSearch}
         status={dapicConferenceStatus}
         employees={hrEmployees}
+        departments={departments}
+        jobPositions={jobPositions}
         dapicEmployees={dapicEmployees}
         products={dapicProducts}
         operations={dapicOperations}
@@ -4278,6 +4346,7 @@ function SettingsView({
         onEmployeeLink={onDapicEmployeeLink}
         onEmployeeIgnore={onDapicEmployeeIgnore}
         onEmployeeReset={onDapicEmployeeReset}
+        onEmployeeCreateAndLink={onDapicEmployeeCreateAndLink}
       />
 
       <DataTable
@@ -4478,6 +4547,8 @@ function DapicConferencePanel({
   search,
   status,
   employees,
+  departments,
+  jobPositions,
   dapicEmployees,
   products,
   operations,
@@ -4489,11 +4560,14 @@ function DapicConferencePanel({
   onEmployeeLink,
   onEmployeeIgnore,
   onEmployeeReset,
+  onEmployeeCreateAndLink,
 }: {
   activeTab: DapicConferenceTab
   search: string
   status: string
   employees: Employee[]
+  departments: Department[]
+  jobPositions: JobPosition[]
   dapicEmployees: DapicEmployee[]
   products: DapicProduct[]
   operations: DapicNamedProduction[]
@@ -4505,9 +4579,11 @@ function DapicConferencePanel({
   onEmployeeLink: (dapicEmployee: DapicEmployee, employeeId: string) => void
   onEmployeeIgnore: (dapicEmployee: DapicEmployee) => void
   onEmployeeReset: (dapicEmployee: DapicEmployee) => void
+  onEmployeeCreateAndLink: (dapicEmployee: DapicEmployee, payload: CreateLinkedEmployeePayload) => void
 }) {
   const [page, setPage] = useState(1)
   const [linkingEmployee, setLinkingEmployee] = useState<DapicEmployee | null>(null)
+  const [creatingEmployee, setCreatingEmployee] = useState<DapicEmployee | null>(null)
   const pageSize = 15
   const employeeSuggestions = useMemo(() => buildDapicEmployeeSuggestions(dapicEmployees, employees), [dapicEmployees, employees])
   const tabs: Array<{ id: DapicConferenceTab; label: string; count: number }> = [
@@ -4520,7 +4596,14 @@ function DapicConferencePanel({
   const current = buildDapicConferenceRows(
     activeTab,
     { employees: dapicEmployees, products, operations, cells, orders },
-    { employeeSuggestions, onEmployeeLink: setLinkingEmployee, onEmployeeSuggestionLink: onEmployeeLink, onEmployeeIgnore, onEmployeeReset },
+    {
+      employeeSuggestions,
+      onEmployeeLink: setLinkingEmployee,
+      onEmployeeCreate: setCreatingEmployee,
+      onEmployeeSuggestionLink: onEmployeeLink,
+      onEmployeeIgnore,
+      onEmployeeReset,
+    },
   )
   const statuses = Array.from(new Set(current.records.map((record) => record.status).filter(Boolean))).sort((left, right) =>
     labelDapicStatus(left).localeCompare(labelDapicStatus(right), 'pt-BR'),
@@ -4660,6 +4743,21 @@ function DapicConferencePanel({
           />
         </Modal>
       )}
+
+      {creatingEmployee && (
+        <Modal title="Criar colaborador e vincular" onClose={() => setCreatingEmployee(null)} size="wide">
+          <DapicEmployeeCreateForm
+            dapicEmployee={creatingEmployee}
+            departments={departments}
+            jobPositions={jobPositions}
+            onCancel={() => setCreatingEmployee(null)}
+            onSubmit={(payload) => {
+              onEmployeeCreateAndLink(creatingEmployee, payload)
+              setCreatingEmployee(null)
+            }}
+          />
+        </Modal>
+      )}
     </section>
   )
 }
@@ -4676,6 +4774,7 @@ function buildDapicConferenceRows(
   actions: {
     employeeSuggestions: Map<string, Employee[]>
     onEmployeeLink: (employee: DapicEmployee) => void
+    onEmployeeCreate: (employee: DapicEmployee) => void
     onEmployeeSuggestionLink: (dapicEmployee: DapicEmployee, employeeId: string) => void
     onEmployeeIgnore: (employee: DapicEmployee) => void
     onEmployeeReset: (employee: DapicEmployee) => void
@@ -4703,7 +4802,15 @@ function buildDapicConferenceRows(
           cells: [
             originBadge('dapic'),
             employee.name,
-            dapicEmployeeActions(employee, suggestions, actions.onEmployeeLink, actions.onEmployeeSuggestionLink, actions.onEmployeeIgnore, actions.onEmployeeReset),
+            dapicEmployeeActions(
+              employee,
+              suggestions,
+              actions.onEmployeeLink,
+              actions.onEmployeeCreate,
+              actions.onEmployeeSuggestionLink,
+              actions.onEmployeeIgnore,
+              actions.onEmployeeReset,
+            ),
             dapicLinkStatusBadge(employee.linkStatus),
             formatDapicEmployeeSuggestion(suggestions),
             employee.employeeName ? `${employee.employeeRegistration ?? '-'} - ${employee.employeeName}` : '-',
@@ -4794,6 +4901,7 @@ function dapicEmployeeActions(
   employee: DapicEmployee,
   suggestions: Employee[],
   onLink: (employee: DapicEmployee) => void,
+  onCreate: (employee: DapicEmployee) => void,
   onSuggestionLink: (dapicEmployee: DapicEmployee, employeeId: string) => void,
   onIgnore: (employee: DapicEmployee) => void,
   onReset: (employee: DapicEmployee) => void,
@@ -4806,6 +4914,7 @@ function dapicEmployeeActions(
         singleSuggestion &&
         actionButton('Vincular sugestao', () => onSuggestionLink(employee, singleSuggestion.id))}
       {actionButton(employee.linkStatus === 'vinculado' ? 'Alterar vinculo' : 'Vincular', () => onLink(employee))}
+      {employee.linkStatus !== 'vinculado' && actionButton('Criar colaborador', () => onCreate(employee))}
       {employee.linkStatus !== 'ignorado' && actionButton('Ignorar', () => onIgnore(employee))}
       {employee.linkStatus !== 'pendente' && actionButton('Redefinir', () => onReset(employee))}
     </div>
@@ -5241,6 +5350,107 @@ function PaginationControls({
         </button>
       </div>
     </div>
+  )
+}
+
+function DapicEmployeeCreateForm({
+  dapicEmployee,
+  departments,
+  jobPositions,
+  onSubmit,
+  onCancel,
+}: {
+  dapicEmployee: DapicEmployee
+  departments: Department[]
+  jobPositions: JobPosition[]
+  onSubmit: (payload: CreateLinkedEmployeePayload) => void
+  onCancel: () => void
+}) {
+  const activeDepartments = departments.filter((department) => department.isActive)
+  const activeJobPositions = jobPositions.filter((jobPosition) => jobPosition.isActive)
+
+  return (
+    <form
+      className="employee-form"
+      onSubmit={(event) => {
+        event.preventDefault()
+        const data = new FormData(event.currentTarget)
+        const compensationModel = String(data.get('compensationModel'))
+        onSubmit({
+          departmentId: String(data.get('departmentId')),
+          jobPositionId: String(data.get('jobPositionId')),
+          registration: String(data.get('registration')),
+          name: String(data.get('name')),
+          documentNumber: String(data.get('documentNumber')),
+          admissionDate: String(data.get('admissionDate')),
+          compensationModel,
+          baseSalary: compensationModel === 'mensalista' ? Number(data.get('baseSalary')) : 0,
+          productionUnitValue: compensationModel === 'producao' ? Number(data.get('productionUnitValue')) : 0,
+        })
+      }}
+    >
+      <label>
+        Matricula
+        <input name="registration" placeholder="Ex: 0123" required />
+      </label>
+      <label className="span-2">
+        Nome
+        <input name="name" defaultValue={dapicEmployee.name} required />
+      </label>
+      <label>
+        CPF/documento
+        <input name="documentNumber" placeholder="Documento obrigatorio" required />
+      </label>
+      <label>
+        Admissao
+        <input name="admissionDate" type="date" defaultValue={todayInputDate()} required />
+      </label>
+      <label>
+        Modelo
+        <select name="compensationModel" defaultValue="producao" required>
+          <option value="producao">Producao</option>
+          <option value="mensalista">Mensalista</option>
+        </select>
+      </label>
+      <label>
+        Setor
+        <select name="departmentId" defaultValue={selectDefaultValue(activeDepartments)} required>
+          {activeDepartments.length !== 1 && <option value="">Selecione o setor</option>}
+          {activeDepartments.map((department) => (
+            <option key={department.id} value={department.id}>
+              {department.internalCode} - {department.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Cargo
+        <select name="jobPositionId" defaultValue={selectDefaultValue(activeJobPositions)} required>
+          {activeJobPositions.length !== 1 && <option value="">Selecione o cargo</option>}
+          {activeJobPositions.map((jobPosition) => (
+            <option key={jobPosition.id} value={jobPosition.id}>
+              {jobPosition.internalCode} - {jobPosition.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Salario mensal
+        <input name="baseSalary" type="number" min="0" step="0.01" defaultValue="0" />
+      </label>
+      <label>
+        Valor producao
+        <input name="productionUnitValue" type="number" min="0" step="0.01" defaultValue="0" />
+      </label>
+      <div className="modal-actions">
+        <button type="button" onClick={onCancel}>
+          Cancelar
+        </button>
+        <button type="submit" disabled={activeDepartments.length === 0 || activeJobPositions.length === 0}>
+          Criar e vincular
+        </button>
+      </div>
+    </form>
   )
 }
 
