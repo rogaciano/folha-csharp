@@ -835,34 +835,22 @@ th {
 
 .rate-editor {
   display: grid;
-  gap: 8px;
-  border: 1px solid #e3e8ef;
-  border-radius: 6px;
-  padding: 10px;
+  gap: 12px;
 }
 
-.rate-editor-header,
 .rate-editor-row {
   display: grid;
-  grid-template-columns: 44px repeat(9, minmax(82px, 1fr));
-  gap: 8px;
-  align-items: center;
-}
-
-.rate-editor-header {
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  border: 1px solid #e3e8ef;
+  border-radius: 6px;
+  padding: 12px;
 }
 
 .rate-editor-row strong {
+  grid-column: 1 / -1;
   color: #263747;
-}
-
-.rate-editor select,
-.rate-editor input {
-  min-width: 0;
+  font-size: 14px;
 }
 
 .company-list {
@@ -1328,10 +1316,6 @@ th {
   }
 
   .range-editor-header {
-    display: none;
-  }
-
-  .rate-editor-header {
     display: none;
   }
 

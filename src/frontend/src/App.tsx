@@ -4725,65 +4725,80 @@ function ProductionRateTableCreateForm({
       </label>
 
       <div className="rate-editor span-2">
-        <div className="rate-editor-header">
-          <span>Linha</span>
-          <span>Produto</span>
-          <span>Operacao</span>
-          <span>Celula</span>
-          <span>Setor</span>
-          <span>Cargo</span>
-          <span>Valor</span>
-          <span>Qtd min.</span>
-          <span>Qtd max.</span>
-          <span>Obs.</span>
-        </div>
         {[1, 2, 3, 4, 5].map((index) => (
           <div className="rate-editor-row" key={index}>
-            <strong>{index}</strong>
-            <select name={`productionProductId${index}`} defaultValue="">
-              <option value="">Todos</option>
-              {productOptions.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.reference} - {product.factoryDescription}
-                </option>
-              ))}
-            </select>
-            <select name={`productionOperationId${index}`} defaultValue="">
-              <option value="">Todas</option>
-              {operations.map((operation) => (
-                <option key={operation.id} value={operation.id}>
-                  {operation.name}
-                </option>
-              ))}
-            </select>
-            <select name={`productionCellId${index}`} defaultValue="">
-              <option value="">Todas</option>
-              {cells.map((cell) => (
-                <option key={cell.id} value={cell.id}>
-                  {cell.name}
-                </option>
-              ))}
-            </select>
-            <select name={`productionDepartmentId${index}`} defaultValue="">
-              <option value="">Todos</option>
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
-            </select>
-            <select name={`productionJobPositionId${index}`} defaultValue="">
-              <option value="">Todos</option>
-              {jobPositions.map((jobPosition) => (
-                <option key={jobPosition.id} value={jobPosition.id}>
-                  {jobPosition.name}
-                </option>
-              ))}
-            </select>
-            <input name={`productionUnitValue${index}`} type="number" min="0" step="0.01" placeholder="0,00" />
-            <input name={`productionMinimumQuantity${index}`} type="number" min="0" step="0.0001" />
-            <input name={`productionMaximumQuantity${index}`} type="number" min="0" step="0.0001" />
-            <input name={`productionRateNotes${index}`} placeholder="Opcional" />
+            <strong>Regra {index}</strong>
+            <label>
+              Produto
+              <select name={`productionProductId${index}`} defaultValue="">
+                <option value="">Todos</option>
+                {productOptions.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.reference} - {product.factoryDescription}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Operacao
+              <select name={`productionOperationId${index}`} defaultValue="">
+                <option value="">Todas</option>
+                {operations.map((operation) => (
+                  <option key={operation.id} value={operation.id}>
+                    {operation.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Celula
+              <select name={`productionCellId${index}`} defaultValue="">
+                <option value="">Todas</option>
+                {cells.map((cell) => (
+                  <option key={cell.id} value={cell.id}>
+                    {cell.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Setor
+              <select name={`productionDepartmentId${index}`} defaultValue="">
+                <option value="">Todos</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Cargo
+              <select name={`productionJobPositionId${index}`} defaultValue="">
+                <option value="">Todos</option>
+                {jobPositions.map((jobPosition) => (
+                  <option key={jobPosition.id} value={jobPosition.id}>
+                    {jobPosition.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Valor
+              <input name={`productionUnitValue${index}`} type="number" min="0" step="0.01" placeholder="0,00" />
+            </label>
+            <label>
+              Qtd min.
+              <input name={`productionMinimumQuantity${index}`} type="number" min="0" step="0.0001" />
+            </label>
+            <label>
+              Qtd max.
+              <input name={`productionMaximumQuantity${index}`} type="number" min="0" step="0.0001" />
+            </label>
+            <label>
+              Obs.
+              <input name={`productionRateNotes${index}`} placeholder="Opcional" />
+            </label>
           </div>
         ))}
       </div>
