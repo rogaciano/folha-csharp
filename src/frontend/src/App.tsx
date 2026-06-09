@@ -4513,7 +4513,7 @@ function DapicConferencePanel({
           <input
             value={search}
             onChange={(event) => onSearchChange(event.currentTarget.value)}
-            placeholder="Nome, referencia, numero, ID externo..."
+            placeholder="Nome, referencia, numero, descricao..."
           />
         </label>
         <label>
@@ -4594,14 +4594,13 @@ function buildDapicConferenceRows(
 ) {
   if (tab === 'employees') {
     return {
-      columns: ['Origem', 'ID externo', 'Nome', 'Fantasia', 'Exibicao', 'Status', 'Ultima sincronizacao'],
+      columns: ['Origem', 'Nome', 'Fantasia', 'Exibicao', 'Status', 'Ultima sincronizacao'],
       records: data.employees.map((employee) => ({
         key: employee.id,
         status: employee.status,
         searchText: [employee.externalId, employee.name, employee.fantasyName, employee.displayName, employee.status].join(' '),
         cells: [
           originBadge('dapic'),
-          employee.externalId,
           employee.name,
           employee.fantasyName ?? '-',
           employee.displayName ?? '-',
@@ -4614,14 +4613,13 @@ function buildDapicConferenceRows(
 
   if (tab === 'products') {
     return {
-      columns: ['Origem', 'ID externo', 'Referencia', 'Descricao', 'Status', 'Ultima sincronizacao'],
+      columns: ['Origem', 'Referencia', 'Descricao', 'Status', 'Ultima sincronizacao'],
       records: data.products.map((product) => ({
         key: product.id,
         status: product.status,
         searchText: [product.externalId, product.reference, product.factoryDescription, product.status].join(' '),
         cells: [
           originBadge('dapic'),
-          product.externalId,
           product.reference,
           product.factoryDescription,
           dapicStatusBadge(product.status),
@@ -4633,14 +4631,13 @@ function buildDapicConferenceRows(
 
   if (tab === 'operations') {
     return {
-      columns: ['Origem', 'ID externo', 'Operacao', 'Descricao', 'Status', 'Ultima sincronizacao'],
+      columns: ['Origem', 'Operacao', 'Descricao', 'Status', 'Ultima sincronizacao'],
       records: data.operations.map((operation) => ({
         key: operation.id,
         status: operation.status,
         searchText: [operation.externalId, operation.name, operation.description, operation.status].join(' '),
         cells: [
           originBadge('dapic'),
-          operation.externalId,
           operation.name,
           operation.description ?? '-',
           dapicStatusBadge(operation.status),
@@ -4652,14 +4649,13 @@ function buildDapicConferenceRows(
 
   if (tab === 'cells') {
     return {
-      columns: ['Origem', 'ID externo', 'Celula', 'Descricao', 'Status', 'Ultima sincronizacao'],
+      columns: ['Origem', 'Celula', 'Descricao', 'Status', 'Ultima sincronizacao'],
       records: data.cells.map((cell) => ({
         key: cell.id,
         status: cell.status,
         searchText: [cell.externalId, cell.name, cell.description, cell.status].join(' '),
         cells: [
           originBadge('dapic'),
-          cell.externalId,
           cell.name,
           cell.description ?? '-',
           dapicStatusBadge(cell.status),
@@ -4670,14 +4666,13 @@ function buildDapicConferenceRows(
   }
 
   return {
-    columns: ['Origem', 'ID externo', 'Numero', 'Descricao', 'Status', 'Data conta', 'Inicio', 'Fim', 'Ultima sincronizacao'],
+    columns: ['Origem', 'Numero', 'Descricao', 'Status', 'Data conta', 'Inicio', 'Fim', 'Ultima sincronizacao'],
     records: data.orders.map((order) => ({
       key: order.id,
       status: order.rawStatus ?? order.status,
       searchText: [order.externalId, order.number, order.description, order.status, order.rawStatus].join(' '),
       cells: [
         originBadge('dapic'),
-        order.externalId,
         order.number ?? '-',
         order.description ?? '-',
         dapicStatusBadge(order.rawStatus ?? order.status),
