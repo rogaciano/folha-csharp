@@ -4229,6 +4229,7 @@ function SettingsView({
       <DataTable
         title="Ultimas sincronizacoes Dapic"
         columns={['Inicio', 'Recurso', 'Status', 'Paginas', 'Lidos', 'Criados', 'Atualizados', 'Erro']}
+        pageSize={10}
         rows={dapicLogs.map((log) => [
           formatDateTime(log.startedAt),
           labelDapicResource(log.resource),
@@ -4349,6 +4350,7 @@ function SettingsView({
       <DataTable
         title="Usuarios e permissoes"
         columns={['Nome', 'E-mail', 'Empresa', 'Perfil', 'Status', 'Ultimo login', 'Acoes']}
+        pageSize={10}
         rows={users.map((user) => [
           user.fullName,
           user.email,
@@ -4375,6 +4377,7 @@ function SettingsView({
       <DataTable
         title="Auditoria recente"
         columns={['Data', 'Usuario', 'Perfil', 'Acao', 'Entidade', 'Descricao', 'IP']}
+        pageSize={10}
         rows={auditLogs.map((log) => [
           formatDateTime(log.createdAt),
           `${log.userName} (${log.userEmail})`,
@@ -4389,6 +4392,7 @@ function SettingsView({
       <DataTable
         title="Tabelas legais parametrizadas"
         columns={['Tipo', 'Nome', 'Vigencia', 'Faixas', 'Status', 'Acoes']}
+        pageSize={10}
         rows={statutoryTables.map((table) => [
           labelStatutoryTableType(table.type),
           table.name,
@@ -4928,11 +4932,24 @@ function DataTable({
   title,
   columns,
   rows,
+  pageSize,
 }: {
   title: string
   columns: string[]
   rows: Array<Array<string | ReactNode>>
+  pageSize?: number
 }) {
+  const [page, setPage] = useState(1)
+  const isPaginated = Boolean(pageSize && rows.length > pageSize)
+  const effectivePageSize = pageSize ?? rows.length
+  const totalPages = Math.max(Math.ceil(rows.length / effectivePageSize), 1)
+  const safePage = Math.min(page, totalPages)
+  const visibleRows = isPaginated ? rows.slice((safePage - 1) * effectivePageSize, safePage * effectivePageSize) : rows
+
+  useEffect(() => {
+    setPage(1)
+  }, [rows.length, pageSize])
+
   return (
     <section className="panel table-panel">
       <h3>{title}</h3>
@@ -4946,7 +4963,7 @@ function DataTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
+            {visibleRows.map((row, index) => (
               <tr key={`${title}-${index}`}>
                 {row.map((cell, cellIndex) => (
                   <td key={`${title}-${index}-${cellIndex}`}>{cell}</td>
@@ -4956,7 +4973,61 @@ function DataTable({
           </tbody>
         </table>
       </div>
+      {isPaginated && (
+        <PaginationControls
+          page={safePage}
+          totalPages={totalPages}
+          pageSize={effectivePageSize}
+          totalRecords={rows.length}
+          onFirst={() => setPage(1)}
+          onPrevious={() => setPage((currentPage) => Math.max(currentPage - 1, 1))}
+          onNext={() => setPage((currentPage) => Math.min(currentPage + 1, totalPages))}
+          onLast={() => setPage(totalPages)}
+        />
+      )}
     </section>
+  )
+}
+
+function PaginationControls({
+  page,
+  totalPages,
+  pageSize,
+  totalRecords,
+  onFirst,
+  onPrevious,
+  onNext,
+  onLast,
+}: {
+  page: number
+  totalPages: number
+  pageSize: number
+  totalRecords: number
+  onFirst: () => void
+  onPrevious: () => void
+  onNext: () => void
+  onLast: () => void
+}) {
+  return (
+    <div className="pagination-bar">
+      <span>
+        Pagina {page} de {totalPages} | {pageSize} por pagina | {totalRecords} registro(s)
+      </span>
+      <div className="pagination-actions">
+        <button type="button" className="secondary-button" disabled={page === 1} onClick={onFirst}>
+          Primeira
+        </button>
+        <button type="button" className="secondary-button" disabled={page === 1} onClick={onPrevious}>
+          Anterior
+        </button>
+        <button type="button" className="secondary-button" disabled={page === totalPages} onClick={onNext}>
+          Proxima
+        </button>
+        <button type="button" className="secondary-button" disabled={page === totalPages} onClick={onLast}>
+          Ultima
+        </button>
+      </div>
+    </div>
   )
 }
 
