@@ -75,6 +75,38 @@ Importante: o nome correto da connection string e `ConnectionStrings__DefaultCon
 
 ## Publicacao na VPS
 
+### Deploy automatico recomendado
+
+Depois da primeira configuracao da VPS, use o script de deploy para evitar copia manual de blocos grandes no terminal:
+
+```bash
+cd /opt/rh-folha
+git pull
+sudo chmod +x deploy/vps/deploy.sh
+sudo deploy/vps/deploy.sh
+```
+
+O script executa:
+
+- `git pull --ff-only`;
+- `dotnet publish` da API;
+- `npm install` e `npm run build` do frontend;
+- copia segura do `dist/.` para `/var/www/rh-folha`;
+- ajuste de permissoes;
+- garantia da pasta persistente `data/uploads`;
+- restart do `rh-folha`;
+- teste do healthcheck local.
+
+Se voce ja executou `git pull` antes e nao quer repetir:
+
+```bash
+sudo RUN_GIT_PULL=0 deploy/vps/deploy.sh
+```
+
+O script deve terminar com `Deploy concluido`. Se falhar em qualquer etapa, ele para e mostra o erro.
+
+### Deploy manual de emergencia
+
 Backend:
 
 ```bash
