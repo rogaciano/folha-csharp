@@ -2,8 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using RhFolha.Domain.Companies;
 using RhFolha.Domain.Departments;
 using RhFolha.Domain.Employees;
+using RhFolha.Domain.Integrations;
 using RhFolha.Domain.JobPositions;
 using RhFolha.Domain.Payroll;
+using RhFolha.Domain.Production;
 using RhFolha.Domain.Security;
 
 namespace RhFolha.Infrastructure.Persistence;
@@ -26,10 +28,29 @@ public sealed class RhFolhaDbContext(DbContextOptions<RhFolhaDbContext> options)
     public DbSet<StatutoryTableRange> StatutoryTableRanges => Set<StatutoryTableRange>();
     public DbSet<SystemUser> SystemUsers => Set<SystemUser>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<ExternalIntegration> ExternalIntegrations => Set<ExternalIntegration>();
+    public DbSet<ExternalSyncLog> ExternalSyncLogs => Set<ExternalSyncLog>();
+    public DbSet<ExternalEntityMap> ExternalEntityMaps => Set<ExternalEntityMap>();
+    public DbSet<DapicEmployee> DapicEmployees => Set<DapicEmployee>();
+    public DbSet<ProductionProduct> ProductionProducts => Set<ProductionProduct>();
+    public DbSet<ProductionOperation> ProductionOperations => Set<ProductionOperation>();
+    public DbSet<ProductionCell> ProductionCells => Set<ProductionCell>();
+    public DbSet<ProductionOrder> ProductionOrders => Set<ProductionOrder>();
+    public DbSet<ProductionOrderProduct> ProductionOrderProducts => Set<ProductionOrderProduct>();
+    public DbSet<ProductTechnicalSheet> ProductTechnicalSheets => Set<ProductTechnicalSheet>();
+    public DbSet<ProductTechnicalSheetOperation> ProductTechnicalSheetOperations => Set<ProductTechnicalSheetOperation>();
+    public DbSet<ProductionRateTable> ProductionRateTables => Set<ProductionRateTable>();
+    public DbSet<ProductionRate> ProductionRates => Set<ProductionRate>();
+    public DbSet<EmployeeProductionEntry> EmployeeProductionEntries => Set<EmployeeProductionEntry>();
+    public DbSet<EmployeeProductionBatch> EmployeeProductionBatches => Set<EmployeeProductionBatch>();
+    public DbSet<EmployeeProductionBatchItem> EmployeeProductionBatchItems => Set<EmployeeProductionBatchItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.ConfigureIntegrations();
+        modelBuilder.ConfigureProduction();
 
         modelBuilder.Entity<Company>(entity =>
         {

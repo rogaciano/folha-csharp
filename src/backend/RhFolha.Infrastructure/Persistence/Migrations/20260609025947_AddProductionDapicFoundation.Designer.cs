@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RhFolha.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using RhFolha.Infrastructure.Persistence;
 namespace RhFolha.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(RhFolhaDbContext))]
-    partial class RhFolhaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260609025947_AddProductionDapicFoundation")]
+    partial class AddProductionDapicFoundation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
