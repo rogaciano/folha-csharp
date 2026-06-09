@@ -113,6 +113,10 @@ public sealed class DapicClient(HttpClient httpClient)
         CancellationToken cancellationToken)
     {
         var path = $"/v1/ordensproducao?Pagina={page}&RegistrosPorPagina={pageSize}&DataInicial={FormatDapicDate(startDate)}";
+        if (endDate.HasValue)
+        {
+            path += $"&DataFinal={FormatDapicDate(endDate.Value)}";
+        }
 
         return GetPagedAsync<DapicProductionOrderDto>(baseUrl, accessToken, path, cancellationToken);
     }

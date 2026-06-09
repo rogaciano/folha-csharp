@@ -409,6 +409,7 @@ function App() {
   const [messageModal, setMessageModal] = useState('')
   const [dapicBusyMessage, setDapicBusyMessage] = useState<string | null>(null)
   const [dapicOrderStartDate, setDapicOrderStartDate] = useState(() => currentMonthStart())
+  const [dapicOrderEndDate, setDapicOrderEndDate] = useState(() => todayInputDate())
 
   const activeCompany = companies[0]
 
@@ -1246,6 +1247,21 @@ function App() {
         return
       }
 
+      if (resource === 'orders' && !dapicOrderEndDate) {
+        showMessage('Informe a data final para sincronizar ordens de producao.', 'warning')
+        return
+      }
+
+      if (resource === 'orders' && dapicOrderEndDate < dapicOrderStartDate) {
+        showMessage('A data final das ordens nao pode ser menor que a data inicial.', 'warning')
+        return
+      }
+
+      if (resource === 'orders' && dapicOrderEndDate > todayInputDate()) {
+        showMessage('A data final das ordens nao pode ser futura.', 'warning')
+        return
+      }
+
       const response = await apiFetch(`/integrations/dapic/${integration.id}/sync/${resource}`, {
         method: 'POST',
         headers: resource === 'orders' ? { 'Content-Type': 'application/json' } : undefined,
@@ -1253,7 +1269,7 @@ function App() {
           resource === 'orders'
             ? JSON.stringify({
                 dataInicial: dapicOrderStartDate,
-                dataFinal: null,
+                dataFinal: dapicOrderEndDate,
               })
             : undefined,
       })
@@ -1477,6 +1493,7 @@ function App() {
             dapicOrders={dapicOrders}
             dapicBusyMessage={dapicBusyMessage}
             dapicOrderStartDate={dapicOrderStartDate}
+            dapicOrderEndDate={dapicOrderEndDate}
             currentUser={session.user}
             onSubmit={handleStatutoryTableSubmit}
             onToggleStatus={handleToggleStatutoryTableStatus}
@@ -1489,6 +1506,7 @@ function App() {
             onDapicTest={handleDapicTest}
             onDapicSync={handleDapicSync}
             onDapicOrderStartDateChange={setDapicOrderStartDate}
+            onDapicOrderEndDateChange={setDapicOrderEndDate}
           />
         )}
       </section>
@@ -3990,6 +4008,7 @@ function SettingsView({
   dapicOrders,
   dapicBusyMessage,
   dapicOrderStartDate,
+  dapicOrderEndDate,
   currentUser,
   onSubmit,
   onToggleStatus,
@@ -4002,6 +4021,7 @@ function SettingsView({
   onDapicTest,
   onDapicSync,
   onDapicOrderStartDateChange,
+  onDapicOrderEndDateChange,
 }: {
   activeCompany: Company | undefined
   companies: Company[]
@@ -4017,6 +4037,7 @@ function SettingsView({
   dapicOrders: DapicProductionOrder[]
   dapicBusyMessage: string | null
   dapicOrderStartDate: string
+  dapicOrderEndDate: string
   currentUser: AuthUser
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onToggleStatus: (table: StatutoryTable) => void
@@ -4029,6 +4050,7 @@ function SettingsView({
   onDapicTest: (integration: DapicIntegration) => void
   onDapicSync: (integration: DapicIntegration, resource: string) => void
   onDapicOrderStartDateChange: (value: string) => void
+  onDapicOrderEndDateChange: (value: string) => void
 }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isUserModalOpen, setIsUserModalOpen] = useState(false)
@@ -4157,13 +4179,24 @@ function SettingsView({
               type="date"
               value={dapicOrderStartDate}
               onChange={(event) => onDapicOrderStartDateChange(event.currentTarget.value)}
+              max={todayInputDate()}
+              required
+            />
+          </label>
+          <label>
+            Data final das ordens
+            <input
+              type="date"
+              value={dapicOrderEndDate}
+              onChange={(event) => onDapicOrderEndDateChange(event.currentTarget.value)}
+              max={todayInputDate()}
               required
             />
           </label>
           <button type="button" disabled={!dapicIntegration || Boolean(dapicBusyMessage)} onClick={() => dapicIntegration && onDapicSync(dapicIntegration, 'orders')}>
             Sincronizar ordens
           </button>
-          <span>A Dapic exige data inicial para consultar ordens de producao.</span>
+          <span>A Dapic exige periodo fechado, sem data final futura.</span>
         </div>
       </Panel>
 
@@ -5328,6 +5361,10 @@ function nextYearStart(value: string) {
 function currentMonthStart() {
   const now = new Date()
   return toInputDate(new Date(now.getFullYear(), now.getMonth(), 1))
+}
+
+function todayInputDate() {
+  return toInputDate(new Date())
 }
 
 function toInputDate(value: Date) {
