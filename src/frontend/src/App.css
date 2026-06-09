@@ -664,6 +664,32 @@ th {
   color: #8a4b00;
 }
 
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #e3e8ef;
+  padding-top: 12px;
+}
+
+.pagination-bar span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.pagination-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.pagination-actions button {
+  min-height: 34px;
+}
+
 .section-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1268,9 +1294,18 @@ th {
 
   .employee-toolbar,
   .employee-section-header,
-  .modal-actions {
+  .modal-actions,
+  .pagination-bar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .pagination-actions {
+    justify-content: stretch;
+  }
+
+  .pagination-actions button {
+    flex: 1;
   }
 
   .modal-backdrop {

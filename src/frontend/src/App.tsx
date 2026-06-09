@@ -4440,6 +4440,8 @@ function DapicConferencePanel({
   onSearchChange: (value: string) => void
   onStatusChange: (value: string) => void
 }) {
+  const [page, setPage] = useState(1)
+  const pageSize = 25
   const tabs: Array<{ id: DapicConferenceTab; label: string; count: number }> = [
     { id: 'employees', label: 'Funcionarios', count: employees.length },
     { id: 'products', label: 'Produtos', count: products.length },
@@ -4457,7 +4459,15 @@ function DapicConferencePanel({
     const searchMatches = !normalizedSearch || normalizeSearch(record.searchText).includes(normalizedSearch)
     return statusMatches && searchMatches
   })
-  const visible = filtered.slice(0, 100)
+  const totalPages = Math.max(Math.ceil(filtered.length / pageSize), 1)
+  const safePage = Math.min(page, totalPages)
+  const firstVisibleIndex = filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1
+  const lastVisibleIndex = Math.min(safePage * pageSize, filtered.length)
+  const visible = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
+
+  useEffect(() => {
+    setPage(1)
+  }, [activeTab, search, status])
 
   return (
     <section className="panel dapic-conference">
@@ -4465,7 +4475,8 @@ function DapicConferencePanel({
         <div>
           <h3>Conferencia da importacao Dapic</h3>
           <span>
-            {filtered.length} de {current.records.length} registro(s) encontrados. Exibindo ate 100 por desempenho.
+            {filtered.length} de {current.records.length} registro(s) encontrados.
+            {filtered.length > 0 && ` Exibindo ${firstVisibleIndex}-${lastVisibleIndex}.`}
           </span>
         </div>
         <div className="origin-legend">
@@ -4538,6 +4549,41 @@ function DapicConferencePanel({
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="pagination-bar">
+        <span>
+          Pagina {safePage} de {totalPages} | {pageSize} registro(s) por pagina
+        </span>
+        <div className="pagination-actions">
+          <button type="button" className="secondary-button" disabled={safePage === 1} onClick={() => setPage(1)}>
+            Primeira
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={safePage === 1}
+            onClick={() => setPage((currentPage) => Math.max(currentPage - 1, 1))}
+          >
+            Anterior
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={safePage === totalPages}
+            onClick={() => setPage((currentPage) => Math.min(currentPage + 1, totalPages))}
+          >
+            Proxima
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={safePage === totalPages}
+            onClick={() => setPage(totalPages)}
+          >
+            Ultima
+          </button>
+        </div>
       </div>
     </section>
   )
