@@ -4445,7 +4445,7 @@ function DapicConferencePanel({
   onStatusChange: (value: string) => void
 }) {
   const [page, setPage] = useState(1)
-  const pageSize = 25
+  const pageSize = 15
   const tabs: Array<{ id: DapicConferenceTab; label: string; count: number }> = [
     { id: 'employees', label: 'Funcionarios', count: employees.length },
     { id: 'products', label: 'Produtos', count: products.length },
