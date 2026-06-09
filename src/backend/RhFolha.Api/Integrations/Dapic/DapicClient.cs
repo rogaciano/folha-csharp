@@ -138,15 +138,33 @@ public sealed class DapicClient(HttpClient httpClient)
 
     private static string? ReadString(JsonElement element, string propertyName)
     {
-        return element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
-            ? property.GetString()
-            : null;
+        if (!element.TryGetProperty(propertyName, out var property))
+        {
+            return null;
+        }
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.String => property.GetString(),
+            JsonValueKind.Number => property.ToString(),
+            _ => null
+        };
     }
 
     private static int? ReadInt(JsonElement element, string propertyName)
     {
-        return element.TryGetProperty(propertyName, out var property) && property.TryGetInt32(out var value)
-            ? value
+        if (!element.TryGetProperty(propertyName, out var property))
+        {
+            return null;
+        }
+
+        if (property.ValueKind == JsonValueKind.Number && property.TryGetInt32(out var numberValue))
+        {
+            return numberValue;
+        }
+
+        return property.ValueKind == JsonValueKind.String && int.TryParse(property.GetString(), out var stringValue)
+            ? stringValue
             : null;
     }
 }
@@ -163,13 +181,13 @@ public sealed record DapicPagedResult<T>(
     int TotalPaginas);
 
 public sealed record DapicEmployeeDto(
-    long Id,
+    JsonElement Id,
     string? Nome,
     string? Fantasia,
     string? NomeExibicao);
 
 public sealed record DapicProductDto(
-    long Id,
+    JsonElement Id,
     string? Referencia,
     string? DescricaoFabrica,
     DateTime? DataCadastro,
@@ -177,13 +195,13 @@ public sealed record DapicProductDto(
     string? Status);
 
 public sealed record DapicNamedEntityDto(
-    long Id,
+    JsonElement Id,
     string? Nome,
     string? Descricao,
     string? Status);
 
 public sealed record DapicProductionOrderDto(
-    long Id,
+    JsonElement Id,
     string? Numero,
     string? Codigo,
     string? Lote,
