@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
+using System.Text.Json;
 using RhFolha.Domain.Integrations;
 using RhFolha.Domain.Production;
 using RhFolha.Infrastructure.Persistence;
@@ -66,19 +68,21 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
                 foreach (var item in items)
                 {
                     var externalId = item.Id.ToString();
-                    var reference = FirstNotEmpty(item.Referencia, externalId);
-                    var description = FirstNotEmpty(item.DescricaoFabrica, reference);
-                    var status = string.IsNullOrWhiteSpace(item.Status) ? "Unknown" : item.Status;
+                    var reference = FirstNotEmpty(ReadText(item.Referencia), ReadText(item.Nome), externalId);
+                    var description = FirstNotEmpty(ReadText(item.DescricaoFabrica), ReadText(item.Descricao), reference);
+                    var status = FirstNotEmpty(ReadText(item.Status), "Unknown");
+                    var createdAt = ReadDateTime(item.DataCadastro);
+                    var updatedAt = ReadDateTime(item.DataModificacao);
 
                     if (existing.TryGetValue(externalId, out var product))
                     {
-                        product.UpdateFromSync(reference, description, status, item.DataCadastro, item.DataModificacao);
+                        product.UpdateFromSync(reference, description, status, createdAt, updatedAt);
                         updated += 1;
                     }
                     else
                     {
                         var newProduct = new ProductionProduct(integration.CompanyId, externalId, reference, description);
-                        newProduct.UpdateFromSync(reference, description, status, item.DataCadastro, item.DataModificacao);
+                        newProduct.UpdateFromSync(reference, description, status, createdAt, updatedAt);
                         dbContext.ProductionProducts.Add(newProduct);
                         created += 1;
                     }
@@ -135,13 +139,13 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
                 foreach (var item in items)
                 {
                     var externalId = item.Id.ToString();
-                    var number = FirstNotEmpty(item.Numero, item.Codigo, item.Lote, externalId);
-                    var description = FirstNotEmpty(item.Descricao, item.Observacao, number);
-                    var status = FirstNotEmpty(item.Status, "Unknown");
-                    var issueDate = ToDateOnly(item.DataConta ?? item.DataCadastro);
-                    var startDate = ToDateOnly(item.DataInicio);
-                    var endDate = ToDateOnly(item.DataFim ?? item.DataFinalizacao ?? item.DataPrevisao);
-                    var externalUpdatedAt = item.DataModificacao ?? item.DataCadastro;
+                    var number = FirstNotEmpty(ReadText(item.Numero), ReadText(item.Codigo), ReadText(item.Lote), externalId);
+                    var description = FirstNotEmpty(ReadText(item.Descricao), ReadText(item.Observacao), number);
+                    var status = FirstNotEmpty(ReadText(item.Status), "Unknown");
+                    var issueDate = ToDateOnly(ReadDateTime(item.DataConta) ?? ReadDateTime(item.DataCadastro));
+                    var startDate = ToDateOnly(ReadDateTime(item.DataInicio));
+                    var endDate = ToDateOnly(ReadDateTime(item.DataFim) ?? ReadDateTime(item.DataFinalizacao) ?? ReadDateTime(item.DataPrevisao));
+                    var externalUpdatedAt = ReadDateTime(item.DataModificacao) ?? ReadDateTime(item.DataCadastro);
 
                     if (existing.TryGetValue(externalId, out var order))
                     {
@@ -326,6 +330,43 @@ public sealed class DapicSyncService(RhFolhaDbContext dbContext, DapicClient dap
     private static string FirstNotEmpty(params string?[] values)
     {
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
+    }
+
+    private static string? ReadText(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number => element.ToString(),
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
+            _ => null
+        };
+    }
+
+    private static DateTime? ReadDateTime(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.String)
+        {
+            var value = element.GetString();
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var cultures = new[] { new CultureInfo("pt-BR"), CultureInfo.InvariantCulture };
+            foreach (var culture in cultures)
+            {
+                if (DateTime.TryParse(value, culture, DateTimeStyles.AssumeLocal, out var parsed))
+                {
+                    return parsed;
+                }
+            }
+
+            return null;
+        }
+
+        return null;
     }
 
     private static DateOnly? ToDateOnly(DateTime? value)

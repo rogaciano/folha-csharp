@@ -284,11 +284,13 @@ public sealed record DapicEmployeeDto(
 
 public sealed record DapicProductDto(
     JsonElement Id,
-    string? Referencia,
-    string? DescricaoFabrica,
-    DateTime? DataCadastro,
-    DateTime? DataModificacao,
-    string? Status);
+    JsonElement Referencia,
+    JsonElement DescricaoFabrica,
+    JsonElement Descricao,
+    JsonElement Nome,
+    JsonElement DataCadastro,
+    JsonElement DataModificacao,
+    JsonElement Status);
 
 public sealed record DapicNamedEntityDto(
     JsonElement Id,
@@ -298,16 +300,16 @@ public sealed record DapicNamedEntityDto(
 
 public sealed record DapicProductionOrderDto(
     JsonElement Id,
-    string? Numero,
-    string? Codigo,
-    string? Lote,
-    string? Descricao,
-    string? Observacao,
-    string? Status,
-    DateTime? DataConta,
-    DateTime? DataCadastro,
-    DateTime? DataInicio,
-    DateTime? DataPrevisao,
-    DateTime? DataFim,
-    DateTime? DataFinalizacao,
-    DateTime? DataModificacao);
+    JsonElement Numero,
+    JsonElement Codigo,
+    JsonElement Lote,
+    JsonElement Descricao,
+    JsonElement Observacao,
+    JsonElement Status,
+    JsonElement DataConta,
+    JsonElement DataCadastro,
+    JsonElement DataInicio,
+    JsonElement DataPrevisao,
+    JsonElement DataFim,
+    JsonElement DataFinalizacao,
+    JsonElement DataModificacao);
