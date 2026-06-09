@@ -46,6 +46,21 @@ public sealed class ExternalIntegration : Entity
     public string? LastError { get; private set; }
     public DateTime? DeletedAt { get; private set; }
 
+    public void UpdateConfiguration(
+        string name,
+        string baseUrl,
+        string externalCompanyIdentifier,
+        string integrationTokenSecret)
+    {
+        Name = name.Trim();
+        BaseUrl = baseUrl.Trim();
+        ExternalCompanyIdentifier = externalCompanyIdentifier.Trim();
+        IntegrationTokenSecret = integrationTokenSecret.Trim();
+        Status = "Active";
+        LastError = null;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void SetAccessToken(string accessToken, DateTime expiresAt)
     {
         AccessToken = accessToken.Trim();

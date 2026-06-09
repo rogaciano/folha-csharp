@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using RhFolha.Api.Security;
+using RhFolha.Api.Integrations.Dapic;
 using RhFolha.Application;
 using RhFolha.Infrastructure;
 using RhFolha.Infrastructure.Persistence;
@@ -19,6 +20,8 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<PasswordService>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<AuditService>();
+builder.Services.AddHttpClient<DapicClient>();
+builder.Services.AddScoped<DapicSyncService>();
 builder.Services.AddHostedService<AdminUserSeedService>();
 var jwtSecret = builder.Configuration["Authentication:Jwt:Secret"];
 if (string.IsNullOrWhiteSpace(jwtSecret) || Encoding.UTF8.GetByteCount(jwtSecret) < 32)

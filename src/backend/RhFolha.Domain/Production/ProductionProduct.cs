@@ -33,4 +33,15 @@ public sealed class ProductionProduct : Entity
     public DateTime? ExternalUpdatedAt { get; private set; }
     public DateTime LastSyncedAt { get; private set; }
     public DateTime? DeletedAt { get; private set; }
+
+    public void UpdateFromSync(string reference, string factoryDescription, string status, DateTime? externalCreatedAt, DateTime? externalUpdatedAt)
+    {
+        Reference = reference.Trim();
+        FactoryDescription = factoryDescription.Trim();
+        Status = string.IsNullOrWhiteSpace(status) ? "Unknown" : status.Trim();
+        ExternalCreatedAt = externalCreatedAt;
+        ExternalUpdatedAt = externalUpdatedAt;
+        LastSyncedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.UtcNow;
+    }
 }

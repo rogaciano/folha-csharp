@@ -34,4 +34,14 @@ public sealed class DapicEmployee : Entity
     public DateTime LastSyncedAt { get; private set; }
     public bool IsIgnored { get; private set; }
     public DateTime? DeletedAt { get; private set; }
+
+    public void UpdateFromSync(string name, string? fantasyName, string? displayName)
+    {
+        Name = name.Trim();
+        FantasyName = string.IsNullOrWhiteSpace(fantasyName) ? null : fantasyName.Trim();
+        DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim();
+        Status = "Active";
+        LastSyncedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.UtcNow;
+    }
 }
