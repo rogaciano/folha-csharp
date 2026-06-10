@@ -138,6 +138,44 @@ public sealed class EmployeeProductionEntry : Entity
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void UpdateDraft(
+        Guid payrollPeriodId,
+        Guid employeeId,
+        DateOnly productionDate,
+        Guid productionProductId,
+        Guid productionOperationId,
+        decimal quantity,
+        string employeeRegistrationSnapshot,
+        string employeeNameSnapshot,
+        string productReferenceSnapshot,
+        string productDescriptionSnapshot,
+        string operationNameSnapshot)
+    {
+        if (Status != "Draft")
+        {
+            throw new InvalidOperationException("Somente producao em rascunho pode ser editada.");
+        }
+
+        if (quantity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantity), "A quantidade de producao deve ser maior que zero.");
+        }
+
+        PayrollPeriodId = payrollPeriodId;
+        EmployeeId = employeeId;
+        ProductionDate = productionDate;
+        ProductionProductId = productionProductId;
+        ProductionOperationId = productionOperationId;
+        Quantity = quantity;
+        TotalAmount = quantity * UnitValue;
+        EmployeeRegistrationSnapshot = employeeRegistrationSnapshot.Trim();
+        EmployeeNameSnapshot = employeeNameSnapshot.Trim();
+        ProductReferenceSnapshot = productReferenceSnapshot.Trim();
+        ProductDescriptionSnapshot = productDescriptionSnapshot.Trim();
+        OperationNameSnapshot = operationNameSnapshot.Trim();
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void SetContext(
         Guid? productionOrderId,
         string? orderNumberSnapshot,

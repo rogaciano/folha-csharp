@@ -230,6 +230,56 @@ Regras:
 - Retornar `400` com mensagem clara quando uma regra impedir a operacao.
 - Retornar `404` quando o registro nao existir.
 
+## Qualidade e testes
+
+A partir deste ponto do projeto, cada bloco funcional relevante deve seguir o padrao minimo de testes abaixo.
+
+Regras obrigatorias:
+
+- Regra de negocio deve ter teste unitario.
+- Endpoint critico deve ter teste de integracao.
+- Permissao, bloqueio operacional e competencia fechada/reaberta devem ter teste obrigatorio.
+- Frontend deve passar em `npm run build` antes de concluir a entrega.
+- Backend deve passar em `dotnet build` e `dotnet test` quando houver alteracao em API, dominio, infraestrutura ou testes.
+
+Escopo recomendado por tipo de recurso:
+
+- CRUD operacional:
+  - criar registro valido;
+  - rejeitar payload invalido;
+  - listar com dados essenciais;
+  - inativar/reativar quando existir ciclo de vida;
+  - bloquear exclusao fisica.
+- Fluxos de folha:
+  - bloquear lancamento em competencia fechada;
+  - permitir lancamento em competencia aberta/reaberta;
+  - preservar snapshots usados no calculo;
+  - impedir alteracao de registros integrados em folha fechada.
+- Permissoes:
+  - perfil leitura nao pode abrir formularios operacionais nem salvar dados;
+  - perfil sem permissao recebe bloqueio na API;
+  - a interface deve esconder ou desabilitar acoes nao permitidas.
+- Producao:
+  - regra de valor deve ser resolvida pela pontuacao documentada;
+  - empate de regra deve bloquear o apontamento/calculo;
+  - ausencia de regra aplicavel deve bloquear o apontamento/calculo;
+  - apontamento aprovado deve ser rastreavel ate a folha.
+
+Testes end-to-end:
+
+- Playwright fica como padrao futuro para fluxos principais, especialmente:
+  - login;
+  - criar colaborador;
+  - configurar tabela de producao;
+  - registrar/aprovar apontamento;
+  - calcular/conferir/fechar folha;
+  - emitir holerite.
+
+Pendencia tecnica registrada:
+
+- Criar projeto/base de testes de integracao da API com banco isolado de teste.
+- Primeiros endpoints a cobrir: autenticacao, tabelas de producao, apontamentos de producao, competencias e permissoes por perfil.
+
 ## Responsividade
 
 - Desktop: usar grades de 2 ou 3 colunas conforme densidade.
@@ -246,4 +296,7 @@ Regras:
 - A tabela mostra status e acoes?
 - Registros historicos foram preservados?
 - `npm run build` passa?
+- Regra de negocio nova tem teste unitario?
+- Endpoint critico novo tem teste de integracao ou pendencia registrada?
+- Bloqueios/permissoes foram testados?
 - `dotnet build` e `dotnet test` passam quando houver mudanca no backend?

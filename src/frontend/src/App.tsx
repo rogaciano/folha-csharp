@@ -816,6 +816,20 @@ function App() {
     await loadData()
   }
 
+  async function putData(path: string, payload: unknown) {
+    const response = await apiFetch(path, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    if (!response.ok) {
+      throw new Error(await readApiError(response, 'Nao foi possivel atualizar o cadastro'))
+    }
+
+    await loadData()
+  }
+
   async function postAction(path: string) {
     const response = await apiFetch(path, {
       method: 'POST',
@@ -1025,27 +1039,30 @@ function App() {
     if (!activeCompany) return
 
     const form = event.currentTarget
-    const data = new FormData(form)
 
     try {
-      await postData('/production-entries', {
-        companyId: activeCompany.id,
-        payrollPeriodId: data.get('payrollPeriodId'),
-        employeeId: data.get('employeeId'),
-        productionDate: data.get('productionDate'),
-        productionOrderId: data.get('productionOrderId') || null,
-        productionOrderProductId: null,
-        productionProductId: data.get('productionProductId'),
-        productionOperationId: data.get('productionOperationId'),
-        productionCellId: data.get('productionCellId') || null,
-        quantity: Number(data.get('quantity') || 0),
-        notes: data.get('notes'),
-      })
+      await postData('/production-entries', buildProductionEntryPayload(form, activeCompany.id))
       form?.reset()
       showMessage('Apontamento de producao cadastrado.')
       setMessageModal('Apontamento de producao cadastrado com valor calculado pela tabela ativa.')
     } catch (exception) {
       showMessage(exception instanceof Error ? exception.message : 'Nao foi possivel cadastrar o apontamento de producao.')
+    }
+  }
+
+  async function handleProductionEntryUpdate(entry: ProductionEntry, event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!activeCompany) return false
+
+    const form = event.currentTarget
+
+    try {
+      await putData(`/production-entries/${entry.id}`, buildProductionEntryPayload(form, activeCompany.id))
+      showMessage('Apontamento de producao atualizado.')
+      return true
+    } catch (exception) {
+      showMessage(exception instanceof Error ? exception.message : 'Nao foi possivel atualizar o apontamento de producao.')
+      return false
     }
   }
 
@@ -1859,6 +1876,7 @@ function App() {
             onSubmit={handlePayrollEntrySubmit}
             onMassSubmit={handleMassPayrollEntrySubmit}
             onProductionSubmit={handleProductionEntrySubmit}
+            onProductionUpdate={handleProductionEntryUpdate}
             onProductionApprove={handleApproveProductionEntry}
             onProductionCancel={handleCancelProductionEntry}
             onFixedSubmit={handleFixedPayrollEntrySubmit}
@@ -2076,6 +2094,7 @@ function PayrollEntriesView({
   onSubmit,
   onMassSubmit,
   onProductionSubmit,
+  onProductionUpdate,
   onProductionApprove,
   onProductionCancel,
   onFixedSubmit,
@@ -2095,6 +2114,7 @@ function PayrollEntriesView({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onMassSubmit: (event: FormEvent<HTMLFormElement>) => void
   onProductionSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onProductionUpdate: (entry: ProductionEntry, event: FormEvent<HTMLFormElement>) => Promise<boolean>
   onProductionApprove: (entry: ProductionEntry) => void
   onProductionCancel: (entry: ProductionEntry) => void
   onFixedSubmit: (event: FormEvent<HTMLFormElement>) => void
@@ -2132,6 +2152,15 @@ function PayrollEntriesView({
   const [entryModal, setEntryModal] = useState<'manual' | 'mass' | 'production' | 'fixed' | null>(null)
   const [editingFixedEntry, setEditingFixedEntry] = useState<FixedPayrollEntry | null>(null)
   const [closingFixedEntry, setClosingFixedEntry] = useState<FixedPayrollEntry | null>(null)
+  const [editingProductionEntry, setEditingProductionEntry] = useState<ProductionEntry | null>(null)
+  const [productionFilters, setProductionFilters] = useState({
+    search: '',
+    payrollPeriodId: 'todos',
+    productId: 'todos',
+    operationId: 'todos',
+    cellId: 'todos',
+    status: 'todos',
+  })
   const departmentOptions = Array.from(
     new Map(employees.map((employee) => [employee.departmentId, employee.departmentName])).entries(),
   )
@@ -2145,6 +2174,27 @@ function PayrollEntriesView({
   )
   const allFilteredSelected =
     filteredEmployees.length > 0 && filteredEmployees.every((employee) => massSelected[employee.id])
+  const filteredProductionEntries = productionEntries.filter((entry) => {
+    const search = normalizeSearch(productionFilters.search)
+    const matchesSearch =
+      search.length === 0 ||
+      normalizeSearch(entry.employeeName).includes(search) ||
+      normalizeSearch(entry.employeeRegistration).includes(search) ||
+      normalizeSearch(entry.productReference).includes(search) ||
+      normalizeSearch(entry.productDescription).includes(search) ||
+      normalizeSearch(entry.operationName).includes(search) ||
+      normalizeSearch(entry.orderNumber ?? '').includes(search)
+
+    return (
+      matchesSearch &&
+      (productionFilters.payrollPeriodId === 'todos' || entry.payrollPeriodId === productionFilters.payrollPeriodId) &&
+      (productionFilters.productId === 'todos' || entry.productionProductId === productionFilters.productId) &&
+      (productionFilters.operationId === 'todos' || entry.productionOperationId === productionFilters.operationId) &&
+      (productionFilters.cellId === 'todos' ||
+        (productionFilters.cellId === 'sem-celula' ? entry.productionCellId === null : entry.productionCellId === productionFilters.cellId)) &&
+      (productionFilters.status === 'todos' || entry.status === productionFilters.status)
+    )
+  })
 
   function toggleFilteredEmployees() {
     const shouldSelect = !allFilteredSelected
@@ -2714,6 +2764,113 @@ function PayrollEntriesView({
         </Modal>
       )}
 
+      {editingProductionEntry && (
+        <Modal title="Editar apontamento de producao" onClose={() => setEditingProductionEntry(null)} size="wide">
+        <form
+          className="entry-form"
+          onSubmit={async (event) => {
+            const saved = await onProductionUpdate(editingProductionEntry, event)
+            if (saved) {
+              setEditingProductionEntry(null)
+            }
+          }}
+        >
+          <label>
+            Competencia
+            <select name="payrollPeriodId" defaultValue={editingProductionEntry.payrollPeriodId} required>
+              {openPeriods.length !== 1 && (
+                <option value="" disabled>
+                  Selecione a competencia
+                </option>
+              )}
+              {openPeriods.map((period) => (
+                <option key={period.id} value={period.id}>
+                  {period.code} - {labelPeriodStatus(period.status)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <SearchableSelect
+            name="employeeId"
+            label="Colaborador"
+            defaultValue={editingProductionEntry.employeeId}
+            placeholder="Selecione o colaborador"
+            options={productionEmployees.map((employee) => ({
+              value: employee.id,
+              label: `${employee.registration} - ${employee.name}`,
+              description: `${employee.departmentName} / ${employee.jobPositionName}`,
+            }))}
+          />
+          <label>
+            Data
+            <input name="productionDate" type="date" defaultValue={editingProductionEntry.productionDate} required />
+          </label>
+          <SearchableSelect
+            name="productionProductId"
+            label="Produto"
+            defaultValue={editingProductionEntry.productionProductId}
+            placeholder="Selecione o produto"
+            options={productionCatalogs.products.map((product) => ({
+              value: product.id,
+              label: `${product.reference} - ${product.factoryDescription}`,
+              description: labelDapicStatus(product.status),
+            }))}
+          />
+          <SearchableSelect
+            name="productionOperationId"
+            label="Operacao"
+            defaultValue={editingProductionEntry.productionOperationId}
+            placeholder="Selecione a operacao"
+            options={productionCatalogs.operations.map((operation) => ({
+              value: operation.id,
+              label: operation.name,
+              description: operation.description ?? labelDapicStatus(operation.status),
+            }))}
+          />
+          <SearchableSelect
+            name="productionCellId"
+            label="Celula"
+            defaultValue={editingProductionEntry.productionCellId ?? ''}
+            placeholder="Sem celula"
+            allowEmpty
+            options={productionCatalogs.cells.map((cell) => ({
+              value: cell.id,
+              label: cell.name,
+              description: cell.description ?? labelDapicStatus(cell.status),
+            }))}
+          />
+          <SearchableSelect
+            name="productionOrderId"
+            label="Ordem"
+            defaultValue={editingProductionEntry.productionOrderId ?? ''}
+            placeholder="Sem ordem"
+            allowEmpty
+            options={productionCatalogs.orders.map((order) => ({
+              value: order.id,
+              label: order.number ?? order.description ?? 'Ordem sem numero',
+              description: [order.issueDate ? formatDate(order.issueDate) : null, labelDapicStatus(order.status)]
+                .filter(Boolean)
+                .join(' / '),
+            }))}
+          />
+          <label>
+            Quantidade
+            <input name="quantity" type="number" min="0.0001" step="0.0001" defaultValue={editingProductionEntry.quantity} required />
+          </label>
+          <label className="span-2">
+            Observacao
+            <input name="notes" defaultValue={editingProductionEntry.notes ?? ''} placeholder="Detalhe operacional opcional" />
+          </label>
+          <div className="modal-actions">
+            <button type="button" onClick={() => setEditingProductionEntry(null)}>
+              Cancelar
+            </button>
+            <button type="submit">Atualizar apontamento</button>
+          </div>
+        </form>
+        </Modal>
+      )}
+
       <DataTable
         title="Lancamentos fixos"
         columns={canEdit ? ['Colaborador', 'Rubrica', 'Tipo', 'Valor', 'Quantidade', 'Vigencia', 'Status', 'Acoes'] : ['Colaborador', 'Rubrica', 'Tipo', 'Valor', 'Quantidade', 'Vigencia', 'Status']}
@@ -2729,11 +2886,95 @@ function PayrollEntriesView({
         ])}
       />
 
+      <section className="panel">
+        <h3>Pesquisar apontamentos de producao</h3>
+        <form className="employee-filter-form">
+          <label>
+            Pesquisar
+            <input
+              value={productionFilters.search}
+              onChange={(event) => setProductionFilters((current) => ({ ...current, search: event.target.value }))}
+              placeholder="Colaborador, produto, operacao, ordem..."
+            />
+          </label>
+          <label>
+            Competencia
+            <select
+              value={productionFilters.payrollPeriodId}
+              onChange={(event) => setProductionFilters((current) => ({ ...current, payrollPeriodId: event.target.value }))}
+            >
+              <option value="todos">Todas</option>
+              {payrollPeriods.map((period) => (
+                <option key={period.id} value={period.id}>
+                  {period.code}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Produto
+            <select
+              value={productionFilters.productId}
+              onChange={(event) => setProductionFilters((current) => ({ ...current, productId: event.target.value }))}
+            >
+              <option value="todos">Todos</option>
+              {productionCatalogs.products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.reference}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Operacao
+            <select
+              value={productionFilters.operationId}
+              onChange={(event) => setProductionFilters((current) => ({ ...current, operationId: event.target.value }))}
+            >
+              <option value="todos">Todas</option>
+              {productionCatalogs.operations.map((operation) => (
+                <option key={operation.id} value={operation.id}>
+                  {operation.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Celula
+            <select
+              value={productionFilters.cellId}
+              onChange={(event) => setProductionFilters((current) => ({ ...current, cellId: event.target.value }))}
+            >
+              <option value="todos">Todas</option>
+              <option value="sem-celula">Sem celula</option>
+              {productionCatalogs.cells.map((cell) => (
+                <option key={cell.id} value={cell.id}>
+                  {cell.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Status
+            <select
+              value={productionFilters.status}
+              onChange={(event) => setProductionFilters((current) => ({ ...current, status: event.target.value }))}
+            >
+              <option value="todos">Todos</option>
+              <option value="Draft">Rascunho</option>
+              <option value="Approved">Aprovado</option>
+              <option value="IntegratedIntoPayroll">Integrado</option>
+              <option value="Canceled">Cancelado</option>
+            </select>
+          </label>
+        </form>
+      </section>
+
       <DataTable
         title="Apontamentos de producao"
         columns={canEdit ? ['Competencia', 'Colaborador', 'Produto', 'Operacao', 'Celula', 'Quantidade', 'Valor unitario', 'Total', 'Data', 'Status', 'Acoes'] : ['Competencia', 'Colaborador', 'Produto', 'Operacao', 'Celula', 'Quantidade', 'Valor unitario', 'Total', 'Data', 'Status']}
         pageSize={15}
-        rows={productionEntries.map((entry) => [
+        rows={filteredProductionEntries.map((entry) => [
           entry.payrollPeriodCode,
           `${entry.employeeRegistration} - ${entry.employeeName}`,
           `${entry.productReference} - ${entry.productDescription}`,
@@ -2747,6 +2988,7 @@ function PayrollEntriesView({
           ...(canEdit
             ? [
                 <div className="table-actions">
+                  {actionButton('Editar', () => setEditingProductionEntry(entry), entry.status !== 'Draft')}
                   {actionButton('Aprovar', () => onProductionApprove(entry), entry.status !== 'Draft')}
                   {actionButton('Cancelar', () => onProductionCancel(entry), entry.status === 'IntegratedIntoPayroll' || entry.status === 'Canceled')}
                 </div>,
@@ -6678,6 +6920,7 @@ function labelAuditAction(value: string) {
     'production_rate_table.activate': 'Ativou tabela de producao',
     'production_rate_table.deactivate': 'Inativou tabela de producao',
     'production_entry.create': 'Criou apontamento',
+    'production_entry.update': 'Atualizou apontamento',
     'production_entry.approve': 'Aprovou apontamento',
     'production_entry.cancel': 'Cancelou apontamento',
     'dapic.employee_link': 'Vinculou funcionario Dapic',
@@ -6898,6 +7141,24 @@ function buildProductionRateTablePayload(form: HTMLFormElement, companyId: strin
     effectiveTo: data.get('effectiveTo') || null,
     notes: data.get('notes') || null,
     rates,
+  }
+}
+
+function buildProductionEntryPayload(form: HTMLFormElement, companyId: string) {
+  const data = new FormData(form)
+
+  return {
+    companyId,
+    payrollPeriodId: data.get('payrollPeriodId'),
+    employeeId: data.get('employeeId'),
+    productionDate: data.get('productionDate'),
+    productionOrderId: data.get('productionOrderId') || null,
+    productionOrderProductId: null,
+    productionProductId: data.get('productionProductId'),
+    productionOperationId: data.get('productionOperationId'),
+    productionCellId: data.get('productionCellId') || null,
+    quantity: Number(data.get('quantity') || 0),
+    notes: data.get('notes') || null,
   }
 }
 

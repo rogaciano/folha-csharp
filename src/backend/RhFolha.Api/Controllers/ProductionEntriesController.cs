@@ -186,6 +186,86 @@ public sealed class ProductionEntriesController(
     }
 
     [Authorize(Roles = RoleGroups.HrOperations)]
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Put(Guid id, CreateProductionEntryRequest request, CancellationToken cancellationToken)
+    {
+        var entry = await dbContext.EmployeeProductionEntries
+            .FirstOrDefaultAsync(item => item.Id == id && item.DeletedAt == null, cancellationToken);
+
+        if (entry is null)
+        {
+            return NotFound();
+        }
+
+        if (entry.Status != "Draft")
+        {
+            return BadRequest(new { message = "Somente apontamentos em rascunho podem ser editados." });
+        }
+
+        var validation = await ValidateHeader(request, cancellationToken);
+        if (validation.Result is not null)
+        {
+            return validation.Result;
+        }
+
+        var employee = validation.Employee!;
+        var product = validation.Product!;
+        var operation = validation.Operation!;
+        var order = validation.Order;
+        var cell = validation.Cell;
+
+        var resolvedRate = await ResolveProductionRate(
+            request.CompanyId,
+            request.ProductionDate,
+            request.ProductionProductId,
+            request.ProductionOperationId,
+            request.ProductionCellId,
+            employee.DepartmentId,
+            employee.JobPositionId,
+            request.Quantity,
+            cancellationToken);
+
+        if (resolvedRate.Result is not null)
+        {
+            return resolvedRate.Result;
+        }
+
+        try
+        {
+            var rate = resolvedRate.Rate!;
+            entry.UpdateDraft(
+                request.PayrollPeriodId,
+                request.EmployeeId,
+                request.ProductionDate,
+                request.ProductionProductId,
+                request.ProductionOperationId,
+                request.Quantity,
+                employee.Registration,
+                employee.Name,
+                product.Reference,
+                product.FactoryDescription,
+                operation.Name);
+            entry.ApplyRate(rate.Id, rate.UnitValue);
+            entry.SetContext(
+                request.ProductionOrderId,
+                order?.Number,
+                request.ProductionOrderProductId,
+                request.ProductionCellId,
+                cell?.Name,
+                request.Notes);
+
+            auditService.Add("production_entry.update", "EmployeeProductionEntry", entry.Id, $"Apontamento de producao atualizado para {employee.Name}.");
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return NoContent();
+        }
+        catch (Exception exception) when (exception is ArgumentOutOfRangeException or InvalidOperationException)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [Authorize(Roles = RoleGroups.HrOperations)]
     [HttpPost("{id:guid}/approve")]
     public async Task<IActionResult> Approve(Guid id, CancellationToken cancellationToken)
     {

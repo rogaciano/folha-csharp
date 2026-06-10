@@ -85,6 +85,53 @@ public sealed class EmployeeProductionEntryTests
         action.Should().Throw<InvalidOperationException>();
     }
 
+    [Fact]
+    public void UpdateDraft_ShouldChangeSnapshotsAndRecalculateTotal()
+    {
+        var entry = CreateEntry(quantity: 1m, unitValue: 10m);
+
+        entry.UpdateDraft(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new DateOnly(2026, 6, 10),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            3m,
+            "0004",
+            "Novo colaborador",
+            "REF-002",
+            "Produto novo",
+            "Acabamento");
+
+        entry.Quantity.Should().Be(3m);
+        entry.TotalAmount.Should().Be(30m);
+        entry.EmployeeRegistrationSnapshot.Should().Be("0004");
+        entry.ProductReferenceSnapshot.Should().Be("REF-002");
+        entry.OperationNameSnapshot.Should().Be("Acabamento");
+    }
+
+    [Fact]
+    public void UpdateDraft_ShouldRejectApprovedEntry()
+    {
+        var entry = CreateEntry(quantity: 1m, unitValue: 10m);
+        entry.Approve(Guid.NewGuid());
+
+        var action = () => entry.UpdateDraft(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new DateOnly(2026, 6, 10),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            3m,
+            "0004",
+            "Novo colaborador",
+            "REF-002",
+            "Produto novo",
+            "Acabamento");
+
+        action.Should().Throw<InvalidOperationException>();
+    }
+
     private static EmployeeProductionEntry CreateEntry(decimal quantity, decimal unitValue)
     {
         return new EmployeeProductionEntry(
