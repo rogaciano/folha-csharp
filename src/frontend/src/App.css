@@ -874,6 +874,62 @@ th {
   font-size: 14px;
 }
 
+.production-rate-details {
+  display: grid;
+  gap: 16px;
+}
+
+.detail-grid,
+.production-rate-rule-list article dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.detail-grid div,
+.production-rate-rule-list article {
+  border: 1px solid #e3e8ef;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.detail-grid span,
+.production-rate-rule-list dt {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.detail-grid strong,
+.production-rate-rule-list dd {
+  margin: 4px 0 0;
+  color: #263747;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.production-rate-rule-list {
+  display: grid;
+  gap: 12px;
+}
+
+.production-rate-rule-list article header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.production-rate-rule-list article header span {
+  color: #256f5c;
+  font-weight: 900;
+}
+
+.production-rate-rule-list dl {
+  margin: 0;
+}
+
 .company-list {
   display: grid;
   gap: 12px;
@@ -1366,6 +1422,11 @@ th {
   }
 
   .rate-editor-row {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-grid,
+  .production-rate-rule-list article dl {
     grid-template-columns: 1fr;
   }
 

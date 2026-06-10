@@ -1191,47 +1191,92 @@ function App() {
     if (!activeCompany) return false
 
     const form = event.currentTarget
-    const data = new FormData(form)
-    const rates = [1, 2, 3, 4, 5]
-      .map((index) => {
-        const unitValue = Number(data.get(`productionUnitValue${index}`) || 0)
-        const minimumQuantityValue = String(data.get(`productionMinimumQuantity${index}`) ?? '')
-        const maximumQuantityValue = String(data.get(`productionMaximumQuantity${index}`) ?? '')
+    const payload = buildProductionRateTablePayload(form, activeCompany.id)
 
-        return {
-          productionProductId: data.get(`productionProductId${index}`) || null,
-          productionOperationId: data.get(`productionOperationId${index}`) || null,
-          productionCellId: data.get(`productionCellId${index}`) || null,
-          departmentId: data.get(`productionDepartmentId${index}`) || null,
-          jobPositionId: data.get(`productionJobPositionId${index}`) || null,
-          unitValue,
-          minimumQuantity: minimumQuantityValue ? Number(minimumQuantityValue) : null,
-          maximumQuantity: maximumQuantityValue ? Number(maximumQuantityValue) : null,
-          notes: data.get(`productionRateNotes${index}`) || null,
-        }
-      })
-      .filter((rate) => rate.unitValue > 0)
-
-    if (rates.length === 0) {
+    if (payload.rates.length === 0) {
       showMessage('Informe pelo menos uma linha de valor para producao.', 'warning')
       return false
     }
 
     try {
-      await postData('/production-rate-tables', {
-        companyId: activeCompany.id,
-        name: data.get('name'),
-        effectiveFrom: data.get('effectiveFrom'),
-        effectiveTo: data.get('effectiveTo') || null,
-        notes: data.get('notes') || null,
-        rates,
-      })
+      await postData('/production-rate-tables', payload)
       form.reset()
       showMessage('Tabela de valores de producao cadastrada.')
       setMessageModal('Tabela de valores de producao cadastrada com sucesso.')
       return true
     } catch {
       showMessage('Nao foi possivel cadastrar a tabela de valores de producao.')
+      return false
+    }
+  }
+
+  async function handleProductionRateTableUpdate(table: ProductionRateTable, event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!activeCompany) return false
+
+    if (table.status !== 'Draft') {
+      showMessage('Somente tabelas em rascunho podem ser editadas. Crie uma nova vigencia para alterar valores ativos.', 'warning')
+      return false
+    }
+
+    const payload = buildProductionRateTablePayload(event.currentTarget, activeCompany.id)
+    if (payload.rates.length === 0) {
+      showMessage('Informe pelo menos uma linha de valor para producao.', 'warning')
+      return false
+    }
+
+    try {
+      const response = await apiFetch(`/production-rate-tables/${table.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: payload.name,
+          effectiveFrom: payload.effectiveFrom,
+          effectiveTo: payload.effectiveTo,
+          notes: payload.notes,
+          rates: payload.rates,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Nao foi possivel atualizar a tabela')
+      }
+
+      await loadData()
+      showMessage('Tabela de producao atualizada.')
+      return true
+    } catch {
+      showMessage('Nao foi possivel atualizar a tabela de producao.')
+      return false
+    }
+  }
+
+  async function handleProductionRateTableDuplicate(table: ProductionRateTable, event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const data = new FormData(event.currentTarget)
+
+    try {
+      const response = await apiFetch(`/production-rate-tables/${table.id}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: data.get('name'),
+          effectiveFrom: data.get('effectiveFrom'),
+          effectiveTo: data.get('effectiveTo') || null,
+          notes: data.get('notes') || null,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Nao foi possivel criar nova vigencia')
+      }
+
+      await loadData()
+      showMessage('Nova vigencia de producao criada em rascunho.')
+      setMessageModal('Nova vigencia criada. Revise os valores e ative quando estiver pronta.')
+      return true
+    } catch {
+      showMessage('Nao foi possivel criar nova vigencia da tabela de producao.')
       return false
     }
   }
@@ -1698,6 +1743,8 @@ function App() {
             onToggleStatus={handleToggleStatutoryTableStatus}
             onDuplicate={handleDuplicateStatutoryTable}
             onProductionRateTableSubmit={handleProductionRateTableSubmit}
+            onProductionRateTableUpdate={handleProductionRateTableUpdate}
+            onProductionRateTableDuplicate={handleProductionRateTableDuplicate}
             onProductionRateTableToggleStatus={handleToggleProductionRateTableStatus}
             onUserSubmit={handleUserSubmit}
             onUserUpdate={handleUserUpdate}
@@ -4223,6 +4270,8 @@ function SettingsView({
   onToggleStatus,
   onDuplicate,
   onProductionRateTableSubmit,
+  onProductionRateTableUpdate,
+  onProductionRateTableDuplicate,
   onProductionRateTableToggleStatus,
   onUserSubmit,
   onUserUpdate,
@@ -4262,6 +4311,8 @@ function SettingsView({
   onToggleStatus: (table: StatutoryTable) => void
   onDuplicate: (table: StatutoryTable) => void
   onProductionRateTableSubmit: (event: FormEvent<HTMLFormElement>) => Promise<boolean>
+  onProductionRateTableUpdate: (table: ProductionRateTable, event: FormEvent<HTMLFormElement>) => Promise<boolean>
+  onProductionRateTableDuplicate: (table: ProductionRateTable, event: FormEvent<HTMLFormElement>) => Promise<boolean>
   onProductionRateTableToggleStatus: (table: ProductionRateTable) => void
   onUserSubmit: (event: FormEvent<HTMLFormElement>) => void
   onUserUpdate: (user: SystemUser, event: FormEvent<HTMLFormElement>) => void
@@ -4279,6 +4330,9 @@ function SettingsView({
 }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isProductionRateModalOpen, setIsProductionRateModalOpen] = useState(false)
+  const [viewingProductionRateTable, setViewingProductionRateTable] = useState<ProductionRateTable | null>(null)
+  const [editingProductionRateTable, setEditingProductionRateTable] = useState<ProductionRateTable | null>(null)
+  const [duplicatingProductionRateTable, setDuplicatingProductionRateTable] = useState<ProductionRateTable | null>(null)
   const [isUserModalOpen, setIsUserModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null)
   const [resetPasswordUser, setResetPasswordUser] = useState<SystemUser | null>(null)
@@ -4296,6 +4350,24 @@ function SettingsView({
     const saved = await onProductionRateTableSubmit(event)
     if (saved) {
       setIsProductionRateModalOpen(false)
+    }
+  }
+
+  async function handleProductionRateUpdate(event: FormEvent<HTMLFormElement>) {
+    if (!editingProductionRateTable) return
+
+    const saved = await onProductionRateTableUpdate(editingProductionRateTable, event)
+    if (saved) {
+      setEditingProductionRateTable(null)
+    }
+  }
+
+  async function handleProductionRateDuplicate(event: FormEvent<HTMLFormElement>) {
+    if (!duplicatingProductionRateTable) return
+
+    const saved = await onProductionRateTableDuplicate(duplicatingProductionRateTable, event)
+    if (saved) {
+      setDuplicatingProductionRateTable(null)
     }
   }
 
@@ -4561,6 +4633,39 @@ function SettingsView({
         </Modal>
       )}
 
+      {viewingProductionRateTable && (
+        <Modal title="Detalhes da tabela de producao" onClose={() => setViewingProductionRateTable(null)} size="wide">
+          <ProductionRateTableDetails table={viewingProductionRateTable} />
+        </Modal>
+      )}
+
+      {editingProductionRateTable && (
+        <Modal title="Editar tabela de producao" onClose={() => setEditingProductionRateTable(null)} size="wide">
+          <ProductionRateTableCreateForm
+            activeCompany={activeCompany}
+            products={dapicProducts}
+            operations={dapicOperations}
+            cells={dapicCells}
+            departments={departments}
+            jobPositions={jobPositions}
+            initialTable={editingProductionRateTable}
+            submitLabel="Salvar alteracoes"
+            onCancel={() => setEditingProductionRateTable(null)}
+            onSubmit={handleProductionRateUpdate}
+          />
+        </Modal>
+      )}
+
+      {duplicatingProductionRateTable && (
+        <Modal title="Nova vigencia de producao" onClose={() => setDuplicatingProductionRateTable(null)}>
+          <ProductionRateTableDuplicateForm
+            table={duplicatingProductionRateTable}
+            onCancel={() => setDuplicatingProductionRateTable(null)}
+            onSubmit={handleProductionRateDuplicate}
+          />
+        </Modal>
+      )}
+
       {isUserModalOpen && (
         <Modal title="Novo usuario" onClose={() => setIsUserModalOpen(false)}>
           <UserCreateForm
@@ -4657,7 +4762,14 @@ function SettingsView({
           `${formatDate(table.effectiveFrom)} ate ${table.effectiveTo ? formatDate(table.effectiveTo) : 'vigente'}`,
           productionRateStatusBadge(table.status),
           formatProductionRateRules(table.rates),
-          actionButton(table.status === 'Active' ? 'Inativar' : 'Ativar', () => onProductionRateTableToggleStatus(table)),
+          (
+            <div className="table-actions">
+              {actionButton('Detalhes', () => setViewingProductionRateTable(table))}
+              {actionButton('Editar', () => setEditingProductionRateTable(table), table.status !== 'Draft')}
+              {actionButton('Nova vigencia', () => setDuplicatingProductionRateTable(table))}
+              {actionButton(table.status === 'Active' ? 'Inativar' : 'Ativar', () => onProductionRateTableToggleStatus(table))}
+            </div>
+          ),
         ])}
       />
 
@@ -4690,6 +4802,8 @@ function ProductionRateTableCreateForm({
   cells,
   departments,
   jobPositions,
+  initialTable,
+  submitLabel = 'Salvar tabela',
   onCancel,
   onSubmit,
 }: {
@@ -4699,6 +4813,8 @@ function ProductionRateTableCreateForm({
   cells: DapicNamedProduction[]
   departments: Department[]
   jobPositions: JobPosition[]
+  initialTable?: ProductionRateTable
+  submitLabel?: string
   onCancel: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }) {
@@ -4706,33 +4822,38 @@ function ProductionRateTableCreateForm({
     .slice()
     .sort((first, second) => first.reference.localeCompare(second.reference))
     .slice(0, 300)
+  const rowCount = Math.max(5, initialTable?.rates.length ?? 0)
+  const rows = Array.from({ length: rowCount }, (_, index) => index + 1)
 
   return (
     <form className="statutory-table-form" onSubmit={(event) => void onSubmit(event)}>
       <label>
         Nome
-        <input name="name" placeholder="Ex: Producao junho 2026" required />
+        <input name="name" placeholder="Ex: Producao junho 2026" defaultValue={initialTable?.name ?? ''} required />
       </label>
       <label>
         Inicio vigencia
-        <input name="effectiveFrom" type="date" defaultValue={currentMonthStart()} required />
+        <input name="effectiveFrom" type="date" defaultValue={initialTable?.effectiveFrom ?? currentMonthStart()} required />
       </label>
       <label>
         Fim vigencia
-        <input name="effectiveTo" type="date" />
+        <input name="effectiveTo" type="date" defaultValue={initialTable?.effectiveTo ?? ''} />
       </label>
       <label className="span-2">
         Observacao
-        <textarea name="notes" rows={3} placeholder="Ex: valores negociados por operacao e celula" />
+        <textarea name="notes" rows={3} placeholder="Ex: valores negociados por operacao e celula" defaultValue={initialTable?.notes ?? ''} />
       </label>
 
       <div className="rate-editor span-2">
-        {[1, 2, 3, 4, 5].map((index) => (
+        {rows.map((index) => {
+          const rate = initialTable?.rates[index - 1]
+
+          return (
           <div className="rate-editor-row" key={index}>
             <strong>Regra {index}</strong>
             <label>
               Produto
-              <select name={`productionProductId${index}`} defaultValue="">
+              <select name={`productionProductId${index}`} defaultValue={rate?.productionProductId ?? ''}>
                 <option value="">Todos</option>
                 {productOptions.map((product) => (
                   <option key={product.id} value={product.id}>
@@ -4743,7 +4864,7 @@ function ProductionRateTableCreateForm({
             </label>
             <label>
               Operacao
-              <select name={`productionOperationId${index}`} defaultValue="">
+              <select name={`productionOperationId${index}`} defaultValue={rate?.productionOperationId ?? ''}>
                 <option value="">Todas</option>
                 {operations.map((operation) => (
                   <option key={operation.id} value={operation.id}>
@@ -4754,7 +4875,7 @@ function ProductionRateTableCreateForm({
             </label>
             <label>
               Celula
-              <select name={`productionCellId${index}`} defaultValue="">
+              <select name={`productionCellId${index}`} defaultValue={rate?.productionCellId ?? ''}>
                 <option value="">Todas</option>
                 {cells.map((cell) => (
                   <option key={cell.id} value={cell.id}>
@@ -4765,7 +4886,7 @@ function ProductionRateTableCreateForm({
             </label>
             <label>
               Setor
-              <select name={`productionDepartmentId${index}`} defaultValue="">
+              <select name={`productionDepartmentId${index}`} defaultValue={rate?.departmentId ?? ''}>
                 <option value="">Todos</option>
                 {departments.map((department) => (
                   <option key={department.id} value={department.id}>
@@ -4776,7 +4897,7 @@ function ProductionRateTableCreateForm({
             </label>
             <label>
               Cargo
-              <select name={`productionJobPositionId${index}`} defaultValue="">
+              <select name={`productionJobPositionId${index}`} defaultValue={rate?.jobPositionId ?? ''}>
                 <option value="">Todos</option>
                 {jobPositions.map((jobPosition) => (
                   <option key={jobPosition.id} value={jobPosition.id}>
@@ -4787,22 +4908,23 @@ function ProductionRateTableCreateForm({
             </label>
             <label>
               Valor
-              <input name={`productionUnitValue${index}`} type="number" min="0" step="0.01" placeholder="0,00" />
+              <input name={`productionUnitValue${index}`} type="number" min="0" step="0.01" placeholder="0,00" defaultValue={rate?.unitValue ?? ''} />
             </label>
             <label>
               Qtd min.
-              <input name={`productionMinimumQuantity${index}`} type="number" min="0" step="0.0001" />
+              <input name={`productionMinimumQuantity${index}`} type="number" min="0" step="0.0001" defaultValue={rate?.minimumQuantity ?? ''} />
             </label>
             <label>
               Qtd max.
-              <input name={`productionMaximumQuantity${index}`} type="number" min="0" step="0.0001" />
+              <input name={`productionMaximumQuantity${index}`} type="number" min="0" step="0.0001" defaultValue={rate?.maximumQuantity ?? ''} />
             </label>
             <label>
               Obs.
-              <input name={`productionRateNotes${index}`} placeholder="Opcional" />
+              <input name={`productionRateNotes${index}`} placeholder="Opcional" defaultValue={rate?.notes ?? ''} />
             </label>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       <div className="modal-actions">
@@ -4810,7 +4932,112 @@ function ProductionRateTableCreateForm({
           Cancelar
         </button>
         <button type="submit" disabled={!activeCompany}>
-          Salvar tabela
+          {submitLabel}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function ProductionRateTableDetails({ table }: { table: ProductionRateTable }) {
+  return (
+    <div className="production-rate-details">
+      <div className="detail-grid">
+        <div>
+          <span>Nome</span>
+          <strong>{table.name}</strong>
+        </div>
+        <div>
+          <span>Vigencia</span>
+          <strong>{formatDate(table.effectiveFrom)} ate {table.effectiveTo ? formatDate(table.effectiveTo) : 'vigente'}</strong>
+        </div>
+        <div>
+          <span>Status</span>
+          <strong>{labelProductionRateStatus(table.status)}</strong>
+        </div>
+        <div>
+          <span>Observacao</span>
+          <strong>{table.notes ?? '-'}</strong>
+        </div>
+      </div>
+
+      <div className="production-rate-rule-list">
+        {table.rates.map((rate, index) => (
+          <article key={rate.id}>
+            <header>
+              <strong>Regra {index + 1}</strong>
+              <span>{formatCurrency(rate.unitValue)}</span>
+            </header>
+            <dl>
+              <div>
+                <dt>Produto</dt>
+                <dd>{rate.productReference ? `${rate.productReference} - ${rate.productDescription ?? ''}` : 'Todos'}</dd>
+              </div>
+              <div>
+                <dt>Operacao</dt>
+                <dd>{rate.operationName ?? 'Todas'}</dd>
+              </div>
+              <div>
+                <dt>Celula</dt>
+                <dd>{rate.cellName ?? 'Todas'}</dd>
+              </div>
+              <div>
+                <dt>Setor</dt>
+                <dd>{rate.departmentName ?? 'Todos'}</dd>
+              </div>
+              <div>
+                <dt>Cargo</dt>
+                <dd>{rate.jobPositionName ?? 'Todos'}</dd>
+              </div>
+              <div>
+                <dt>Quantidade</dt>
+                <dd>{formatProductionQuantityRange(rate)}</dd>
+              </div>
+              <div>
+                <dt>Observacao</dt>
+                <dd>{rate.notes ?? '-'}</dd>
+              </div>
+            </dl>
+          </article>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ProductionRateTableDuplicateForm({
+  table,
+  onCancel,
+  onSubmit,
+}: {
+  table: ProductionRateTable
+  onCancel: () => void
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void
+}) {
+  return (
+    <form className="entry-form" onSubmit={(event) => void onSubmit(event)}>
+      <label className="span-2">
+        Nome
+        <input name="name" defaultValue={`${table.name} - nova vigencia`} required />
+      </label>
+      <label>
+        Inicio vigencia
+        <input name="effectiveFrom" type="date" defaultValue={nextMonthStart(table.effectiveFrom)} required />
+      </label>
+      <label>
+        Fim vigencia
+        <input name="effectiveTo" type="date" />
+      </label>
+      <label className="span-2">
+        Observacao
+        <textarea name="notes" rows={3} defaultValue={table.notes ?? ''} />
+      </label>
+      <div className="modal-actions">
+        <button type="button" onClick={onCancel}>
+          Cancelar
+        </button>
+        <button type="submit">
+          Criar rascunho
         </button>
       </div>
     </form>
@@ -6061,6 +6288,8 @@ function labelAuditAction(value: string) {
     'statutory_table.activate': 'Reativou tabela legal',
     'statutory_table.deactivate': 'Inativou tabela legal',
     'production_rate_table.create': 'Criou tabela de producao',
+    'production_rate_table.update': 'Atualizou tabela de producao',
+    'production_rate_table.duplicate': 'Criou vigencia de producao',
     'production_rate_table.activate': 'Ativou tabela de producao',
     'production_rate_table.deactivate': 'Inativou tabela de producao',
     'dapic.employee_link': 'Vinculou funcionario Dapic',
@@ -6251,6 +6480,51 @@ function formatProductionRateRules(rates: ProductionRate[]) {
     .join(' | ')
 }
 
+function buildProductionRateTablePayload(form: HTMLFormElement, companyId: string) {
+  const data = new FormData(form)
+  const rowCount = form.querySelectorAll('input[name^="productionUnitValue"]').length
+  const rates = Array.from({ length: rowCount }, (_, index) => index + 1)
+    .map((index) => {
+      const unitValue = Number(data.get(`productionUnitValue${index}`) || 0)
+      const minimumQuantityValue = String(data.get(`productionMinimumQuantity${index}`) ?? '')
+      const maximumQuantityValue = String(data.get(`productionMaximumQuantity${index}`) ?? '')
+
+      return {
+        productionProductId: data.get(`productionProductId${index}`) || null,
+        productionOperationId: data.get(`productionOperationId${index}`) || null,
+        productionCellId: data.get(`productionCellId${index}`) || null,
+        departmentId: data.get(`productionDepartmentId${index}`) || null,
+        jobPositionId: data.get(`productionJobPositionId${index}`) || null,
+        unitValue,
+        minimumQuantity: minimumQuantityValue ? Number(minimumQuantityValue) : null,
+        maximumQuantity: maximumQuantityValue ? Number(maximumQuantityValue) : null,
+        notes: data.get(`productionRateNotes${index}`) || null,
+      }
+    })
+    .filter((rate) => rate.unitValue > 0)
+
+  return {
+    companyId,
+    name: data.get('name'),
+    effectiveFrom: data.get('effectiveFrom'),
+    effectiveTo: data.get('effectiveTo') || null,
+    notes: data.get('notes') || null,
+    rates,
+  }
+}
+
+function formatProductionQuantityRange(rate: ProductionRate) {
+  if (rate.minimumQuantity === null && rate.maximumQuantity === null) return 'Qualquer quantidade'
+
+  if (rate.minimumQuantity !== null && rate.maximumQuantity !== null) {
+    return `${formatNumber(rate.minimumQuantity)} a ${formatNumber(rate.maximumQuantity)}`
+  }
+
+  if (rate.minimumQuantity !== null) return `A partir de ${formatNumber(rate.minimumQuantity)}`
+
+  return `Ate ${formatNumber(rate.maximumQuantity ?? 0)}`
+}
+
 function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', {
     style: 'currency',
@@ -6295,9 +6569,19 @@ function activeBadge(isActive: boolean) {
 }
 
 function productionRateStatusBadge(value: string) {
-  const label = value === 'Active' ? 'Ativa' : value === 'Inactive' ? 'Inativa' : 'Rascunho'
+  const label = labelProductionRateStatus(value)
   const statusClass = value === 'Active' ? 'status-active' : value === 'Inactive' ? 'status-inactive' : 'status-warning'
   return <span className={`status-badge ${statusClass}`}>{label}</span>
+}
+
+function labelProductionRateStatus(value: string) {
+  const labels: Record<string, string> = {
+    Draft: 'Rascunho',
+    Active: 'Ativa',
+    Inactive: 'Inativa',
+  }
+
+  return labels[value] ?? value
 }
 
 function originBadge(origin: 'manual' | 'dapic') {
@@ -6425,6 +6709,11 @@ function formatDate(value: string) {
 function nextYearStart(value: string) {
   const year = Number(value.slice(0, 4))
   return `${year + 1}-01-01`
+}
+
+function nextMonthStart(value: string) {
+  const date = new Date(`${value}T00:00:00`)
+  return toInputDate(new Date(date.getFullYear(), date.getMonth() + 1, 1))
 }
 
 function currentMonthStart() {

@@ -82,26 +82,10 @@ public sealed class ProductionRateTablesController(
 
         var table = new ProductionRateTable(request.CompanyId, request.Name, request.EffectiveFrom, request.EffectiveTo);
         table.Update(request.Name, request.EffectiveFrom, request.EffectiveTo, request.Notes);
-
-        foreach (var rateRequest in request.Rates.Where(rate => rate.UnitValue > 0))
+        var validation = await FillTableRates(table, request.Rates, cancellationToken);
+        if (validation is not null)
         {
-            var validation = await ValidateRateReferences(request.CompanyId, rateRequest, cancellationToken);
-            if (validation is not null)
-            {
-                return BadRequest(new { message = validation });
-            }
-
-            var rate = new ProductionRate(request.CompanyId, table.Id, rateRequest.UnitValue);
-            rate.ConfigureCriteria(
-                rateRequest.ProductionProductId,
-                rateRequest.ProductionOperationId,
-                rateRequest.ProductionCellId,
-                rateRequest.DepartmentId,
-                rateRequest.JobPositionId,
-                rateRequest.MinimumQuantity,
-                rateRequest.MaximumQuantity,
-                rateRequest.Notes);
-            table.Rates.Add(rate);
+            return BadRequest(new { message = validation });
         }
 
         if (table.Rates.Count == 0)
@@ -114,6 +98,109 @@ public sealed class ProductionRateTablesController(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return CreatedAtAction(nameof(Get), new { id = table.Id }, new { table.Id });
+    }
+
+    [Authorize(Roles = RoleGroups.HrOperations)]
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Put(Guid id, UpdateProductionRateTableRequest request, CancellationToken cancellationToken)
+    {
+        var table = await dbContext.ProductionRateTables
+            .Include(item => item.Rates)
+            .FirstOrDefaultAsync(item => item.Id == id && item.DeletedAt == null, cancellationToken);
+
+        if (table is null)
+        {
+            return NotFound();
+        }
+
+        if (table.Status != "Draft")
+        {
+            return BadRequest(new { message = "Somente tabelas em rascunho podem ser editadas. Para alterar valores vigentes, crie uma nova vigencia." });
+        }
+
+        if (request.EffectiveTo.HasValue && request.EffectiveTo.Value < request.EffectiveFrom)
+        {
+            return BadRequest(new { message = "Fim de vigencia nao pode ser menor que o inicio." });
+        }
+
+        foreach (var rate in table.Rates.Where(rate => rate.DeletedAt == null))
+        {
+            rate.Delete();
+        }
+
+        table.Update(request.Name, request.EffectiveFrom, request.EffectiveTo, request.Notes);
+        var validation = await FillTableRates(table, request.Rates, cancellationToken);
+        if (validation is not null)
+        {
+            return BadRequest(new { message = validation });
+        }
+
+        if (table.Rates.Count(rate => rate.DeletedAt == null) == 0)
+        {
+            return BadRequest(new { message = "Informe pelo menos uma linha de valor." });
+        }
+
+        auditService.Add("production_rate_table.update", "ProductionRateTable", table.Id, $"Tabela de producao {table.Name} atualizada em rascunho.");
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    [Authorize(Roles = RoleGroups.HrOperations)]
+    [HttpPost("{id:guid}/duplicate")]
+    public async Task<IActionResult> Duplicate(Guid id, DuplicateProductionRateTableRequest request, CancellationToken cancellationToken)
+    {
+        var source = await dbContext.ProductionRateTables
+            .Include(table => table.Rates.Where(rate => rate.DeletedAt == null))
+            .FirstOrDefaultAsync(table => table.Id == id && table.DeletedAt == null, cancellationToken);
+
+        if (source is null)
+        {
+            return NotFound();
+        }
+
+        if (request.EffectiveFrom <= source.EffectiveFrom)
+        {
+            return BadRequest(new { message = "A nova vigencia deve ser posterior ao inicio da tabela original." });
+        }
+
+        if (request.EffectiveTo.HasValue && request.EffectiveTo.Value < request.EffectiveFrom)
+        {
+            return BadRequest(new { message = "Fim de vigencia nao pode ser menor que o inicio." });
+        }
+
+        var duplicate = new ProductionRateTable(
+            source.CompanyId,
+            string.IsNullOrWhiteSpace(request.Name) ? $"{source.Name} - nova vigencia" : request.Name,
+            request.EffectiveFrom,
+            request.EffectiveTo);
+        duplicate.Update(duplicate.Name, duplicate.EffectiveFrom, duplicate.EffectiveTo, string.IsNullOrWhiteSpace(request.Notes) ? source.Notes : request.Notes);
+
+        var copiedRates = source.Rates
+            .Where(rate => rate.DeletedAt == null)
+            .Select(rate => new CreateProductionRateRequest(
+                rate.ProductionProductId,
+                rate.ProductionOperationId,
+                rate.ProductionCellId,
+                rate.DepartmentId,
+                rate.JobPositionId,
+                rate.UnitValue,
+                rate.MinimumQuantity,
+                rate.MaximumQuantity,
+                rate.Notes))
+            .ToList();
+
+        var validation = await FillTableRates(duplicate, copiedRates, cancellationToken);
+        if (validation is not null)
+        {
+            return BadRequest(new { message = validation });
+        }
+
+        dbContext.ProductionRateTables.Add(duplicate);
+        auditService.Add("production_rate_table.duplicate", "ProductionRateTable", duplicate.Id, $"Nova vigencia criada a partir da tabela {source.Name}.");
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return CreatedAtAction(nameof(Get), new { id = duplicate.Id }, new { duplicate.Id });
     }
 
     [Authorize(Roles = RoleGroups.HrOperations)]
@@ -184,6 +271,32 @@ public sealed class ProductionRateTablesController(
 
         return null;
     }
+
+    private async Task<string?> FillTableRates(ProductionRateTable table, IEnumerable<CreateProductionRateRequest> rates, CancellationToken cancellationToken)
+    {
+        foreach (var rateRequest in rates.Where(rate => rate.UnitValue > 0))
+        {
+            var validation = await ValidateRateReferences(table.CompanyId, rateRequest, cancellationToken);
+            if (validation is not null)
+            {
+                return validation;
+            }
+
+            var rate = new ProductionRate(table.CompanyId, table.Id, rateRequest.UnitValue);
+            rate.ConfigureCriteria(
+                rateRequest.ProductionProductId,
+                rateRequest.ProductionOperationId,
+                rateRequest.ProductionCellId,
+                rateRequest.DepartmentId,
+                rateRequest.JobPositionId,
+                rateRequest.MinimumQuantity,
+                rateRequest.MaximumQuantity,
+                rateRequest.Notes);
+            table.Rates.Add(rate);
+        }
+
+        return null;
+    }
 }
 
 public sealed record CreateProductionRateTableRequest(
@@ -203,6 +316,19 @@ public sealed record CreateProductionRateRequest(
     decimal UnitValue,
     decimal? MinimumQuantity,
     decimal? MaximumQuantity,
+    string? Notes);
+
+public sealed record UpdateProductionRateTableRequest(
+    string Name,
+    DateOnly EffectiveFrom,
+    DateOnly? EffectiveTo,
+    string? Notes,
+    IReadOnlyList<CreateProductionRateRequest> Rates);
+
+public sealed record DuplicateProductionRateTableRequest(
+    string? Name,
+    DateOnly EffectiveFrom,
+    DateOnly? EffectiveTo,
     string? Notes);
 
 public sealed record ProductionRateTableResponse(

@@ -82,4 +82,10 @@ public sealed class ProductionRate : Entity
         Status = "Inactive";
         UpdatedAt = DateTime.UtcNow;
     }
+
+    public void Delete()
+    {
+        DeletedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.UtcNow;
+    }
 }
