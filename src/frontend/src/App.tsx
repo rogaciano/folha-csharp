@@ -4308,9 +4308,6 @@ function SettingsView({
         <button type="button" onClick={() => setIsCreateModalOpen(true)}>
           Nova tabela legal
         </button>
-        <button type="button" onClick={() => setIsProductionRateModalOpen(true)}>
-          Nova tabela de producao
-        </button>
       </section>
 
       <Panel title="Empresa">
@@ -4648,6 +4645,11 @@ function SettingsView({
 
       <DataTable
         title="Tabelas de valores de producao"
+        action={
+          <button type="button" onClick={() => setIsProductionRateModalOpen(true)}>
+            Nova tabela de producao
+          </button>
+        }
         columns={['Nome', 'Vigencia', 'Status', 'Regras', 'Acoes']}
         pageSize={10}
         rows={productionRateTables.map((table) => [
@@ -5533,11 +5535,13 @@ function MessageModal({ message, onClose }: { message: string; onClose: () => vo
 
 function DataTable({
   title,
+  action,
   columns,
   rows,
   pageSize,
 }: {
   title: string
+  action?: ReactNode
   columns: string[]
   rows: Array<Array<string | ReactNode>>
   pageSize?: number
@@ -5555,7 +5559,10 @@ function DataTable({
 
   return (
     <section className="panel table-panel">
-      <h3>{title}</h3>
+      <header className="table-panel-header">
+        <h3>{title}</h3>
+        {action}
+      </header>
       <div className="table-scroll">
         <table>
           <thead>

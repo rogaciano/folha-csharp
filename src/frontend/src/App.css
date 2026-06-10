@@ -1149,6 +1149,22 @@ th {
   text-transform: uppercase;
 }
 
+.table-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.table-panel-header h3 {
+  margin: 0;
+}
+
+.table-panel-header button {
+  flex: 0 0 auto;
+}
+
 .report-section-header {
   display: flex;
   align-items: center;
@@ -1364,6 +1380,7 @@ th {
 
   .report-toolbar,
   .report-section-header,
+  .table-panel-header,
   .dapic-conference-header {
     align-items: stretch;
     flex-direction: column;
