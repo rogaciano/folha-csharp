@@ -58,6 +58,23 @@ function apiFetch(path: string, init: RequestInit = {}) {
   })
 }
 
+async function readApiError(response: Response, fallback: string) {
+  try {
+    const data = await response.json()
+    if (typeof data?.message === 'string' && data.message.trim()) {
+      return data.message
+    }
+
+    if (typeof data?.title === 'string' && data.title.trim()) {
+      return data.title
+    }
+  } catch {
+    // Mantem a mensagem padrao quando a API nao retorna JSON.
+  }
+
+  return fallback
+}
+
 type View =
   | 'dashboard'
   | 'employees'
@@ -787,7 +804,7 @@ function App() {
     })
 
     if (!response.ok) {
-      throw new Error('Nao foi possivel salvar o cadastro')
+      throw new Error(await readApiError(response, 'Nao foi possivel salvar o cadastro'))
     }
 
     await loadData()
@@ -799,7 +816,7 @@ function App() {
     })
 
     if (!response.ok) {
-      throw new Error('Nao foi possivel executar a acao')
+      throw new Error(await readApiError(response, 'Nao foi possivel executar a acao'))
     }
 
     await loadData()
@@ -1021,8 +1038,8 @@ function App() {
       form?.reset()
       showMessage('Apontamento de producao cadastrado.')
       setMessageModal('Apontamento de producao cadastrado com valor calculado pela tabela ativa.')
-    } catch {
-      showMessage('Nao foi possivel cadastrar o apontamento de producao.')
+    } catch (exception) {
+      showMessage(exception instanceof Error ? exception.message : 'Nao foi possivel cadastrar o apontamento de producao.')
     }
   }
 
@@ -1030,8 +1047,8 @@ function App() {
     try {
       await postAction(`/production-entries/${entry.id}/approve`)
       showMessage('Apontamento de producao aprovado.')
-    } catch {
-      showMessage('Nao foi possivel aprovar o apontamento de producao.')
+    } catch (exception) {
+      showMessage(exception instanceof Error ? exception.message : 'Nao foi possivel aprovar o apontamento de producao.')
     }
   }
 
@@ -1042,8 +1059,8 @@ function App() {
     try {
       await postAction(`/production-entries/${entry.id}/cancel`)
       showMessage('Apontamento de producao cancelado.')
-    } catch {
-      showMessage('Nao foi possivel cancelar o apontamento de producao.')
+    } catch (exception) {
+      showMessage(exception instanceof Error ? exception.message : 'Nao foi possivel cancelar o apontamento de producao.')
     }
   }
 
