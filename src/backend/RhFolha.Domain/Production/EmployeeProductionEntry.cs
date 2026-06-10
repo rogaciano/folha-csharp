@@ -119,6 +119,58 @@ public sealed class EmployeeProductionEntry : Entity
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void ApplyRate(Guid productionRateId, decimal unitValue)
+    {
+        if (Status != "Draft")
+        {
+            throw new InvalidOperationException("Somente producao em rascunho pode ter valor recalculado.");
+        }
+
+        if (unitValue < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(unitValue), "O valor unitario da producao nao pode ser negativo.");
+        }
+
+        ProductionRateId = productionRateId;
+        UnitValue = unitValue;
+        TotalAmount = Quantity * unitValue;
+        RateSource = "RateTable";
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void SetContext(
+        Guid? productionOrderId,
+        string? orderNumberSnapshot,
+        Guid? productionOrderProductId,
+        Guid? productionCellId,
+        string? cellNameSnapshot,
+        string? notes)
+    {
+        if (Status != "Draft")
+        {
+            throw new InvalidOperationException("Somente producao em rascunho pode ser alterada.");
+        }
+
+        ProductionOrderId = productionOrderId;
+        OrderNumberSnapshot = string.IsNullOrWhiteSpace(orderNumberSnapshot) ? null : orderNumberSnapshot.Trim();
+        ProductionOrderProductId = productionOrderProductId;
+        ProductionCellId = productionCellId;
+        CellNameSnapshot = string.IsNullOrWhiteSpace(cellNameSnapshot) ? null : cellNameSnapshot.Trim();
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Cancel()
+    {
+        if (Status == "IntegratedIntoPayroll")
+        {
+            throw new InvalidOperationException("Producao integrada na folha nao pode ser cancelada.");
+        }
+
+        Status = "Canceled";
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void MarkIntegrated(Guid payrollCalculationId, Guid payrollCalculationItemId)
     {
         if (Status != "Approved")

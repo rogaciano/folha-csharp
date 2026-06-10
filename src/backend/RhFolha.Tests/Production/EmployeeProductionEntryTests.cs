@@ -59,6 +59,32 @@ public sealed class EmployeeProductionEntryTests
         entry.IntegratedPayrollCalculationItemId.Should().Be(itemId);
     }
 
+    [Fact]
+    public void ApplyRate_ShouldSetRateSourceAndRecalculateTotal()
+    {
+        var entry = CreateEntry(quantity: 8m, unitValue: 1m);
+        var rateId = Guid.NewGuid();
+
+        entry.ApplyRate(rateId, 2.75m);
+
+        entry.ProductionRateId.Should().Be(rateId);
+        entry.UnitValue.Should().Be(2.75m);
+        entry.TotalAmount.Should().Be(22m);
+        entry.RateSource.Should().Be("RateTable");
+    }
+
+    [Fact]
+    public void Cancel_ShouldRejectIntegratedEntry()
+    {
+        var entry = CreateEntry(quantity: 1m, unitValue: 10m);
+        entry.Approve(Guid.NewGuid());
+        entry.MarkIntegrated(Guid.NewGuid(), Guid.NewGuid());
+
+        var action = entry.Cancel;
+
+        action.Should().Throw<InvalidOperationException>();
+    }
+
     private static EmployeeProductionEntry CreateEntry(decimal quantity, decimal unitValue)
     {
         return new EmployeeProductionEntry(

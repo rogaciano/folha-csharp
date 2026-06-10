@@ -410,6 +410,67 @@ type DapicProductionOrder = {
   lastSyncedAt: string
 }
 
+type ProductionCatalogProduct = {
+  id: string
+  companyId: string
+  reference: string
+  factoryDescription: string
+  status: string
+}
+
+type ProductionCatalogNamed = {
+  id: string
+  companyId: string
+  name: string
+  description: string | null
+  status: string
+}
+
+type ProductionCatalogOrder = {
+  id: string
+  companyId: string
+  number: string | null
+  description: string | null
+  status: string
+  issueDate: string | null
+}
+
+type ProductionCatalogs = {
+  products: ProductionCatalogProduct[]
+  operations: ProductionCatalogNamed[]
+  cells: ProductionCatalogNamed[]
+  orders: ProductionCatalogOrder[]
+}
+
+type ProductionEntry = {
+  id: string
+  companyId: string
+  payrollPeriodId: string
+  payrollPeriodCode: string
+  employeeId: string
+  employeeRegistration: string
+  employeeName: string
+  productionDate: string
+  productionOrderId: string | null
+  orderNumber: string | null
+  productionProductId: string
+  productReference: string
+  productDescription: string
+  productionOperationId: string
+  operationName: string
+  productionCellId: string | null
+  cellName: string | null
+  quantity: number
+  unitValue: number
+  totalAmount: number
+  rateSource: string
+  productionRateId: string | null
+  origin: string
+  status: string
+  notes: string | null
+  approvedAt: string | null
+}
+
 type DapicConferenceTab = 'employees' | 'products' | 'operations' | 'cells' | 'orders'
 type CreateLinkedEmployeePayload = {
   departmentId: string
@@ -446,6 +507,13 @@ function App() {
   const [payrollCalculationDetail, setPayrollCalculationDetail] = useState<PayrollCalculationDetail | null>(null)
   const [statutoryTables, setStatutoryTables] = useState<StatutoryTable[]>([])
   const [productionRateTables, setProductionRateTables] = useState<ProductionRateTable[]>([])
+  const [productionEntries, setProductionEntries] = useState<ProductionEntry[]>([])
+  const [productionCatalogs, setProductionCatalogs] = useState<ProductionCatalogs>({
+    products: [],
+    operations: [],
+    cells: [],
+    orders: [],
+  })
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [dapicIntegrations, setDapicIntegrations] = useState<DapicIntegration[]>([])
@@ -513,6 +581,8 @@ function App() {
         payrollCalculationsResponse,
         statutoryTablesResponse,
         productionRateTablesResponse,
+        productionEntriesResponse,
+        productionCatalogsResponse,
       ] = await Promise.all([
           apiFetch('/companies'),
           apiFetch('/departments'),
@@ -525,6 +595,8 @@ function App() {
           apiFetch('/payroll-calculations'),
           apiFetch('/statutory-tables'),
           apiFetch('/production-rate-tables'),
+          apiFetch('/production-entries'),
+          apiFetch('/production-entries/catalogs'),
         ])
 
       if (
@@ -538,7 +610,9 @@ function App() {
         fixedPayrollEntriesResponse.status === 401 ||
         payrollCalculationsResponse.status === 401 ||
         statutoryTablesResponse.status === 401 ||
-        productionRateTablesResponse.status === 401
+        productionRateTablesResponse.status === 401 ||
+        productionEntriesResponse.status === 401 ||
+        productionCatalogsResponse.status === 401
       ) {
         handleLogout()
         return
@@ -555,7 +629,9 @@ function App() {
         !fixedPayrollEntriesResponse.ok ||
         !payrollCalculationsResponse.ok ||
         !statutoryTablesResponse.ok ||
-        !productionRateTablesResponse.ok
+        !productionRateTablesResponse.ok ||
+        !productionEntriesResponse.ok ||
+        !productionCatalogsResponse.ok
       ) {
         throw new Error('Falha ao carregar cadastros')
       }
@@ -571,6 +647,8 @@ function App() {
       setPayrollCalculations(await payrollCalculationsResponse.json())
       setStatutoryTables(await statutoryTablesResponse.json())
       setProductionRateTables(await productionRateTablesResponse.json())
+      setProductionEntries(await productionEntriesResponse.json())
+      setProductionCatalogs(await productionCatalogsResponse.json())
       if (isAdmin(session.user.role)) {
         const [
           usersResponse,
@@ -687,6 +765,8 @@ function App() {
     setPayrollCalculationDetail(null)
     setStatutoryTables([])
     setProductionRateTables([])
+    setProductionEntries([])
+    setProductionCatalogs({ products: [], operations: [], cells: [], orders: [] })
     setSystemUsers([])
     setAuditLogs([])
     setDapicIntegrations([])
@@ -914,6 +994,56 @@ function App() {
       setMessageModal(successMessage)
     } catch {
       showMessage('Nao foi possivel cadastrar os lancamentos em massa.')
+    }
+  }
+
+  async function handleProductionEntrySubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!activeCompany) return
+
+    const form = event.currentTarget
+    const data = new FormData(form)
+
+    try {
+      await postData('/production-entries', {
+        companyId: activeCompany.id,
+        payrollPeriodId: data.get('payrollPeriodId'),
+        employeeId: data.get('employeeId'),
+        productionDate: data.get('productionDate'),
+        productionOrderId: data.get('productionOrderId') || null,
+        productionOrderProductId: null,
+        productionProductId: data.get('productionProductId'),
+        productionOperationId: data.get('productionOperationId'),
+        productionCellId: data.get('productionCellId') || null,
+        quantity: Number(data.get('quantity') || 0),
+        notes: data.get('notes'),
+      })
+      form?.reset()
+      showMessage('Apontamento de producao cadastrado.')
+      setMessageModal('Apontamento de producao cadastrado com valor calculado pela tabela ativa.')
+    } catch {
+      showMessage('Nao foi possivel cadastrar o apontamento de producao.')
+    }
+  }
+
+  async function handleApproveProductionEntry(entry: ProductionEntry) {
+    try {
+      await postAction(`/production-entries/${entry.id}/approve`)
+      showMessage('Apontamento de producao aprovado.')
+    } catch {
+      showMessage('Nao foi possivel aprovar o apontamento de producao.')
+    }
+  }
+
+  async function handleCancelProductionEntry(entry: ProductionEntry) {
+    const confirmed = window.confirm(`Cancelar o apontamento de producao de ${entry.employeeName}?`)
+    if (!confirmed) return
+
+    try {
+      await postAction(`/production-entries/${entry.id}/cancel`)
+      showMessage('Apontamento de producao cancelado.')
+    } catch {
+      showMessage('Nao foi possivel cancelar o apontamento de producao.')
     }
   }
 
@@ -1701,8 +1831,13 @@ function App() {
             payrollPeriods={payrollPeriods}
             payrollEntries={payrollEntries}
             fixedPayrollEntries={fixedPayrollEntries}
+            productionEntries={productionEntries}
+            productionCatalogs={productionCatalogs}
             onSubmit={handlePayrollEntrySubmit}
             onMassSubmit={handleMassPayrollEntrySubmit}
+            onProductionSubmit={handleProductionEntrySubmit}
+            onProductionApprove={handleApproveProductionEntry}
+            onProductionCancel={handleCancelProductionEntry}
             onFixedSubmit={handleFixedPayrollEntrySubmit}
             onFixedUpdate={handleFixedPayrollEntryUpdate}
             onFixedClose={handleFixedPayrollEntryClose}
@@ -1913,8 +2048,13 @@ function PayrollEntriesView({
   payrollPeriods,
   payrollEntries,
   fixedPayrollEntries,
+  productionEntries,
+  productionCatalogs,
   onSubmit,
   onMassSubmit,
+  onProductionSubmit,
+  onProductionApprove,
+  onProductionCancel,
   onFixedSubmit,
   onFixedUpdate,
   onFixedClose,
@@ -1927,8 +2067,13 @@ function PayrollEntriesView({
   payrollPeriods: PayrollPeriod[]
   payrollEntries: PayrollEntry[]
   fixedPayrollEntries: FixedPayrollEntry[]
+  productionEntries: ProductionEntry[]
+  productionCatalogs: ProductionCatalogs
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onMassSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onProductionSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onProductionApprove: (entry: ProductionEntry) => void
+  onProductionCancel: (entry: ProductionEntry) => void
   onFixedSubmit: (event: FormEvent<HTMLFormElement>) => void
   onFixedUpdate: (entry: FixedPayrollEntry, event: FormEvent<HTMLFormElement>) => void
   onFixedClose: (entry: FixedPayrollEntry, event: FormEvent<HTMLFormElement>) => void
@@ -1944,6 +2089,13 @@ function PayrollEntriesView({
   const defaultManualRubricId = selectDefaultValue(manualRubrics)
   const defaultMassPeriodId = selectDefaultValue(openPeriods)
   const defaultMassRubricId = selectDefaultValue(massRubrics)
+  const defaultProductionPeriodId = selectDefaultValue(openPeriods)
+  const defaultProductionEmployeeId = selectDefaultValue(employees.filter((employee) => employee.compensationModel === 'producao'))
+  const defaultProductionProductId = selectDefaultValue(productionCatalogs.products)
+  const defaultProductionOperationId = selectDefaultValue(productionCatalogs.operations)
+  const defaultProductionCellId = selectDefaultValue(productionCatalogs.cells)
+  const defaultProductionOrderId = selectDefaultValue(productionCatalogs.orders)
+  const productionEmployees = employees.filter((employee) => employee.compensationModel === 'producao')
   const [massDepartmentId, setMassDepartmentId] = useState('todos')
   const [massJobPositionId, setMassJobPositionId] = useState('todos')
   const [massCalculationMode, setMassCalculationMode] = useState('valor_fixo')
@@ -1954,7 +2106,7 @@ function PayrollEntriesView({
   const [massAmounts, setMassAmounts] = useState<Record<string, string>>({})
   const [massQuantities, setMassQuantities] = useState<Record<string, string>>({})
   const [massNotes, setMassNotes] = useState<Record<string, string>>({})
-  const [entryModal, setEntryModal] = useState<'manual' | 'mass' | 'fixed' | null>(null)
+  const [entryModal, setEntryModal] = useState<'manual' | 'mass' | 'production' | 'fixed' | null>(null)
   const [editingFixedEntry, setEditingFixedEntry] = useState<FixedPayrollEntry | null>(null)
   const [closingFixedEntry, setClosingFixedEntry] = useState<FixedPayrollEntry | null>(null)
   const departmentOptions = Array.from(
@@ -2048,6 +2200,9 @@ function PayrollEntriesView({
           </button>
           <button type="button" onClick={() => setEntryModal('mass')}>
             Lancamento em massa
+          </button>
+          <button type="button" onClick={() => setEntryModal('production')}>
+            Apontamento de producao
           </button>
           <button type="button" onClick={() => setEntryModal('fixed')}>
             Lancamento fixo
@@ -2338,6 +2493,124 @@ function PayrollEntriesView({
         </Modal>
       )}
 
+      {entryModal === 'production' && (
+        <Modal title="Apontamento de producao" onClose={() => setEntryModal(null)} size="wide">
+        <form className="entry-form" onSubmit={(event) => void onProductionSubmit(event)}>
+          <label>
+            Competencia
+            <select name="payrollPeriodId" defaultValue={defaultProductionPeriodId} required>
+              {openPeriods.length !== 1 && (
+                <option value="" disabled>
+                  Selecione a competencia
+                </option>
+              )}
+              {openPeriods.map((period) => (
+                <option key={period.id} value={period.id}>
+                  {period.code} - {labelPeriodStatus(period.status)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Colaborador
+            <select name="employeeId" defaultValue={defaultProductionEmployeeId} required>
+              {productionEmployees.length !== 1 && (
+                <option value="" disabled>
+                  Selecione o colaborador
+                </option>
+              )}
+              {productionEmployees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.registration} - {employee.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Data
+            <input name="productionDate" type="date" defaultValue={defaultPeriod?.startsOn ?? ''} required />
+          </label>
+          <label>
+            Produto
+            <select name="productionProductId" defaultValue={defaultProductionProductId} required>
+              {productionCatalogs.products.length !== 1 && (
+                <option value="" disabled>
+                  Selecione o produto
+                </option>
+              )}
+              {productionCatalogs.products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.reference} - {product.factoryDescription}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Operacao
+            <select name="productionOperationId" defaultValue={defaultProductionOperationId} required>
+              {productionCatalogs.operations.length !== 1 && (
+                <option value="" disabled>
+                  Selecione a operacao
+                </option>
+              )}
+              {productionCatalogs.operations.map((operation) => (
+                <option key={operation.id} value={operation.id}>
+                  {operation.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Celula
+            <select name="productionCellId" defaultValue={defaultProductionCellId}>
+              <option value="">Sem celula</option>
+              {productionCatalogs.cells.map((cell) => (
+                <option key={cell.id} value={cell.id}>
+                  {cell.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Ordem
+            <select name="productionOrderId" defaultValue={defaultProductionOrderId}>
+              <option value="">Sem ordem</option>
+              {productionCatalogs.orders.map((order) => (
+                <option key={order.id} value={order.id}>
+                  {order.number ?? order.description ?? 'Ordem sem numero'} - {labelDapicStatus(order.status)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Quantidade
+            <input name="quantity" type="number" min="0.0001" step="0.0001" required />
+          </label>
+          <label className="span-2">
+            Observacao
+            <input name="notes" placeholder="Detalhe operacional opcional" />
+          </label>
+          <div className="modal-actions">
+            <button type="button" onClick={() => setEntryModal(null)}>
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={
+                !activeCompany ||
+                openPeriods.length === 0 ||
+                productionEmployees.length === 0 ||
+                productionCatalogs.products.length === 0 ||
+                productionCatalogs.operations.length === 0
+              }
+            >
+              Salvar apontamento
+            </button>
+          </div>
+        </form>
+        </Modal>
+      )}
+
       {entryModal === 'fixed' && (
         <Modal title="Lancamento fixo por colaborador" onClose={() => setEntryModal(null)} size="wide">
         <form className="entry-form" onSubmit={(event) => void onFixedSubmit(event)}>
@@ -2438,6 +2711,32 @@ function PayrollEntriesView({
           `${formatDate(entry.startsOn)} a ${entry.endsOn ? formatDate(entry.endsOn) : 'sem fim'}`,
           activeBadge(entry.isActive),
           ...(canEdit ? [fixedPayrollEntryActions(entry, setEditingFixedEntry, setClosingFixedEntry, onFixedToggle)] : []),
+        ])}
+      />
+
+      <DataTable
+        title="Apontamentos de producao"
+        columns={canEdit ? ['Competencia', 'Colaborador', 'Produto', 'Operacao', 'Celula', 'Quantidade', 'Valor unitario', 'Total', 'Data', 'Status', 'Acoes'] : ['Competencia', 'Colaborador', 'Produto', 'Operacao', 'Celula', 'Quantidade', 'Valor unitario', 'Total', 'Data', 'Status']}
+        pageSize={15}
+        rows={productionEntries.map((entry) => [
+          entry.payrollPeriodCode,
+          `${entry.employeeRegistration} - ${entry.employeeName}`,
+          `${entry.productReference} - ${entry.productDescription}`,
+          entry.operationName,
+          entry.cellName ?? '-',
+          formatNumber(entry.quantity),
+          formatCurrency(entry.unitValue),
+          formatCurrency(entry.totalAmount),
+          formatDate(entry.productionDate),
+          productionEntryStatusBadge(entry.status),
+          ...(canEdit
+            ? [
+                <div className="table-actions">
+                  {actionButton('Aprovar', () => onProductionApprove(entry), entry.status !== 'Draft')}
+                  {actionButton('Cancelar', () => onProductionCancel(entry), entry.status === 'IntegratedIntoPayroll' || entry.status === 'Canceled')}
+                </div>,
+              ]
+            : []),
         ])}
       />
 
@@ -6292,6 +6591,9 @@ function labelAuditAction(value: string) {
     'production_rate_table.duplicate': 'Criou vigencia de producao',
     'production_rate_table.activate': 'Ativou tabela de producao',
     'production_rate_table.deactivate': 'Inativou tabela de producao',
+    'production_entry.create': 'Criou apontamento',
+    'production_entry.approve': 'Aprovou apontamento',
+    'production_entry.cancel': 'Cancelou apontamento',
     'dapic.employee_link': 'Vinculou funcionario Dapic',
     'dapic.employee_ignore': 'Ignorou funcionario Dapic',
     'dapic.employee_reset_link': 'Redefiniu funcionario Dapic',
@@ -6572,6 +6874,25 @@ function productionRateStatusBadge(value: string) {
   const label = labelProductionRateStatus(value)
   const statusClass = value === 'Active' ? 'status-active' : value === 'Inactive' ? 'status-inactive' : 'status-warning'
   return <span className={`status-badge ${statusClass}`}>{label}</span>
+}
+
+function productionEntryStatusBadge(value: string) {
+  const labels: Record<string, string> = {
+    Draft: 'Rascunho',
+    PendingReview: 'Pendente',
+    Approved: 'Aprovado',
+    Rejected: 'Rejeitado',
+    IntegratedIntoPayroll: 'Integrado',
+    Canceled: 'Cancelado',
+  }
+  const statusClass =
+    value === 'Approved' || value === 'IntegratedIntoPayroll'
+      ? 'status-active'
+      : value === 'Canceled' || value === 'Rejected'
+        ? 'status-inactive'
+        : 'status-warning'
+
+  return <span className={`status-badge ${statusClass}`}>{labels[value] ?? value}</span>
 }
 
 function labelProductionRateStatus(value: string) {
