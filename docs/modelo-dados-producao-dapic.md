@@ -421,14 +421,34 @@ Campos:
 
 Regras:
 
-- Permitir regra generica por operacao.
-- Permitir regra mais especifica por produto + operacao.
-- Se mais de uma regra bater, usar prioridade:
-  1. produto + operacao + colaborador/cargo quando existir futuramente;
-  2. produto + operacao;
-  3. operacao;
-  4. produto;
-  5. valor padrao do contrato/colaborador.
+- Uma regra com campo opcional vazio significa "todos" ou "qualquer" para aquele criterio.
+- Uma regra so pode ser candidata quando todos os criterios preenchidos batem com o apontamento e com o cadastro do colaborador.
+- Criterios avaliados: produto, operacao, celula, setor, cargo e faixa de quantidade.
+- A faixa de quantidade deve obedecer:
+  - `minimum_quantity` nulo: sem limite minimo;
+  - `maximum_quantity` nulo: sem limite maximo;
+  - quando informados, a quantidade apontada deve estar dentro dos limites.
+- Entre as regras candidatas, usar pontuacao de especificidade:
+  - produto informado: `+32`;
+  - operacao informada: `+16`;
+  - celula informada: `+8`;
+  - setor informado: `+4`;
+  - cargo informado: `+2`;
+  - faixa de quantidade informada: `+1`.
+- A regra com maior pontuacao vence.
+- A ordem de cadastro nao pode ser usada como criterio de escolha.
+- Em caso de empate, aplicar desempate nesta ordem:
+  1. regra com produto informado;
+  2. regra com operacao informada;
+  3. regra com celula informada;
+  4. regra com setor informado;
+  5. regra com cargo informado;
+  6. maior `minimum_quantity`;
+  7. menor `maximum_quantity`;
+  8. se ainda houver empate, bloquear o apontamento/calculo e exigir ajuste da tabela.
+- Se nenhuma regra for encontrada, no MVP o apontamento/calculo deve ser bloqueado para evitar pagamento sem parametro.
+- Valor manual futuro deve exigir permissao e auditoria.
+- Ao calcular o apontamento, gravar `production_rate_id`, `unit_value`, `total_amount` e snapshots dos dados usados.
 
 Indices recomendados:
 

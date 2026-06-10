@@ -336,6 +336,112 @@ No fechamento/calculo da competencia:
 9. Conferir producao.
 10. Calcular folha considerando producao conferida.
 
+## Regra de prioridade da tabela de valores de producao
+
+Ao registrar um apontamento de producao, o sistema deve buscar uma tabela de valores ativa na data do apontamento e escolher a regra aplicavel mais especifica.
+
+Dados considerados no apontamento:
+
+- produto/referencia;
+- operacao;
+- celula;
+- setor do colaborador;
+- cargo do colaborador;
+- quantidade produzida;
+- data do apontamento.
+
+### Filtro inicial
+
+Uma regra de valor so pode ser candidata quando:
+
+- pertence a uma tabela ativa;
+- a data do apontamento esta dentro da vigencia da tabela;
+- todos os criterios preenchidos na regra batem com o apontamento;
+- criterios vazios na regra significam "todos";
+- a quantidade do apontamento respeita `minimum_quantity` e `maximum_quantity`, quando informados;
+- a regra esta ativa e nao possui exclusao virtual.
+
+Exemplo:
+
+- regra com apenas operacao vale para qualquer produto/celula/setor/cargo daquela operacao;
+- regra com produto + operacao vale somente para aquele produto naquela operacao;
+- regra com quantidade minima 101 vale apenas para apontamentos com quantidade igual ou maior que 101.
+
+### Pontuacao de especificidade
+
+Entre as regras candidatas, o sistema deve calcular uma pontuacao:
+
+- produto informado: `+32`;
+- operacao informada: `+16`;
+- celula informada: `+8`;
+- setor informado: `+4`;
+- cargo informado: `+2`;
+- faixa de quantidade informada: `+1`.
+
+A regra com maior pontuacao vence.
+
+Essa pontuacao evita depender da ordem de cadastro e protege a folha contra escolha manual inconsistente.
+
+### Ordem conceitual de prioridade
+
+A pontuacao acima representa, na pratica, a seguinte ordem:
+
+1. produto + operacao + celula + setor + cargo;
+2. produto + operacao + celula;
+3. produto + operacao;
+4. operacao + celula;
+5. operacao;
+6. produto;
+7. setor + cargo;
+8. cargo;
+9. setor;
+10. regra geral.
+
+### Desempate
+
+Se duas ou mais regras tiverem a mesma pontuacao, aplicar desempate nesta ordem:
+
+1. regra com produto informado vence;
+2. depois regra com operacao informada;
+3. depois regra com celula informada;
+4. depois regra com setor informado;
+5. depois regra com cargo informado;
+6. depois regra com maior `minimum_quantity`;
+7. depois regra com menor `maximum_quantity`;
+8. se ainda houver empate, bloquear o calculo e exigir ajuste da tabela.
+
+O sistema nao deve escolher uma regra ambigua silenciosamente.
+
+### Vigencia e historico
+
+- Tabela em `Draft` pode ser editada.
+- Tabela `Active` ou `Inactive` nao deve ter valores editados diretamente.
+- Alteracao de valor vigente deve ser feita por `Nova vigencia`, copiando a tabela anterior para rascunho.
+- Tabelas e regras usadas em folha fechada devem permanecer rastreaveis.
+- Exclusao de regra deve ser virtual.
+
+### Exemplos
+
+Exemplo 1:
+
+- regra A: operacao costura, valor `R$ 1,00`;
+- regra B: produto camisa + operacao costura, valor `R$ 1,30`.
+
+Apontamento de camisa/costura usa a regra B, pois ela e mais especifica.
+
+Exemplo 2:
+
+- regra A: operacao embalagem, quantidade 1 a 100, valor `R$ 0,50`;
+- regra B: operacao embalagem, quantidade minima 101, valor `R$ 0,60`.
+
+Apontamento com quantidade 120 usa a regra B.
+
+Exemplo 3:
+
+- duas regras ativas com produto + operacao e mesma faixa de quantidade.
+
+O sistema deve bloquear o calculo e pedir ajuste da tabela para remover a ambiguidade.
+
 ## Cuidados tecnicos
 
 - Respeitar limite de 100 requisicoes/minuto.
