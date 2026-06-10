@@ -302,6 +302,88 @@ input[type='checkbox'] {
   padding: 0;
 }
 
+.searchable-select-field {
+  min-width: 0;
+}
+
+.searchable-select {
+  position: relative;
+  min-width: 0;
+}
+
+.searchable-select input {
+  padding-right: 28px;
+}
+
+.searchable-select::after {
+  position: absolute;
+  top: 15px;
+  right: 10px;
+  width: 0;
+  height: 0;
+  border-top: 6px solid #64748b;
+  border-right: 5px solid transparent;
+  border-left: 5px solid transparent;
+  content: '';
+  pointer-events: none;
+}
+
+.searchable-select-list {
+  position: absolute;
+  z-index: 35;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  display: none;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #cad3de;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(16, 35, 63, 0.18);
+  padding: 4px;
+}
+
+.searchable-select:focus-within .searchable-select-list {
+  display: grid;
+  gap: 2px;
+}
+
+.searchable-select-list button {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 38px;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #17202a;
+  padding: 7px 9px;
+  text-align: left;
+}
+
+.searchable-select-list button:hover,
+.searchable-select-list button.selected {
+  background: #e8eef7;
+  color: #10233f;
+}
+
+.searchable-select-list button strong,
+.searchable-select-empty {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.searchable-select-list button span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.searchable-select-empty {
+  color: #64748b;
+  padding: 8px;
+}
+
 .employee-form button,
 .rubric-form button,
 .period-form button,

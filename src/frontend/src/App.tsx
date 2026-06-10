@@ -508,6 +508,12 @@ type FeedbackMessage = {
   type: FeedbackType
 }
 
+type SelectOption = {
+  value: string
+  label: string
+  description?: string
+}
+
 function App() {
   const [view, setView] = useState<View>('dashboard')
   const [session, setSession] = useState<AuthSession | null>(() => getStoredSession())
@@ -2528,77 +2534,69 @@ function PayrollEntriesView({
               ))}
             </select>
           </label>
-          <label>
-            Colaborador
-            <select name="employeeId" defaultValue={defaultProductionEmployeeId} required>
-              {productionEmployees.length !== 1 && (
-                <option value="" disabled>
-                  Selecione o colaborador
-                </option>
-              )}
-              {productionEmployees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.registration} - {employee.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SearchableSelect
+            name="employeeId"
+            label="Colaborador"
+            defaultValue={defaultProductionEmployeeId}
+            placeholder="Selecione o colaborador"
+            options={productionEmployees.map((employee) => ({
+              value: employee.id,
+              label: `${employee.registration} - ${employee.name}`,
+              description: `${employee.departmentName} / ${employee.jobPositionName}`,
+            }))}
+          />
           <label>
             Data
             <input name="productionDate" type="date" defaultValue={defaultPeriod?.startsOn ?? ''} required />
           </label>
-          <label>
-            Produto
-            <select name="productionProductId" defaultValue={defaultProductionProductId} required>
-              {productionCatalogs.products.length !== 1 && (
-                <option value="" disabled>
-                  Selecione o produto
-                </option>
-              )}
-              {productionCatalogs.products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.reference} - {product.factoryDescription}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Operacao
-            <select name="productionOperationId" defaultValue={defaultProductionOperationId} required>
-              {productionCatalogs.operations.length !== 1 && (
-                <option value="" disabled>
-                  Selecione a operacao
-                </option>
-              )}
-              {productionCatalogs.operations.map((operation) => (
-                <option key={operation.id} value={operation.id}>
-                  {operation.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Celula
-            <select name="productionCellId" defaultValue={defaultProductionCellId}>
-              <option value="">Sem celula</option>
-              {productionCatalogs.cells.map((cell) => (
-                <option key={cell.id} value={cell.id}>
-                  {cell.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Ordem
-            <select name="productionOrderId" defaultValue={defaultProductionOrderId}>
-              <option value="">Sem ordem</option>
-              {productionCatalogs.orders.map((order) => (
-                <option key={order.id} value={order.id}>
-                  {order.number ?? order.description ?? 'Ordem sem numero'} - {labelDapicStatus(order.status)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SearchableSelect
+            name="productionProductId"
+            label="Produto"
+            defaultValue={defaultProductionProductId}
+            placeholder="Selecione o produto"
+            options={productionCatalogs.products.map((product) => ({
+              value: product.id,
+              label: `${product.reference} - ${product.factoryDescription}`,
+              description: labelDapicStatus(product.status),
+            }))}
+          />
+          <SearchableSelect
+            name="productionOperationId"
+            label="Operacao"
+            defaultValue={defaultProductionOperationId}
+            placeholder="Selecione a operacao"
+            options={productionCatalogs.operations.map((operation) => ({
+              value: operation.id,
+              label: operation.name,
+              description: operation.description ?? labelDapicStatus(operation.status),
+            }))}
+          />
+          <SearchableSelect
+            name="productionCellId"
+            label="Celula"
+            defaultValue={defaultProductionCellId}
+            placeholder="Sem celula"
+            allowEmpty
+            options={productionCatalogs.cells.map((cell) => ({
+              value: cell.id,
+              label: cell.name,
+              description: cell.description ?? labelDapicStatus(cell.status),
+            }))}
+          />
+          <SearchableSelect
+            name="productionOrderId"
+            label="Ordem"
+            defaultValue={defaultProductionOrderId}
+            placeholder="Sem ordem"
+            allowEmpty
+            options={productionCatalogs.orders.map((order) => ({
+              value: order.id,
+              label: order.number ?? order.description ?? 'Ordem sem numero',
+              description: [order.issueDate ? formatDate(order.issueDate) : null, labelDapicStatus(order.status)]
+                .filter(Boolean)
+                .join(' / '),
+            }))}
+          />
           <label>
             Quantidade
             <input name="quantity" type="number" min="0.0001" step="0.0001" required />
@@ -6139,6 +6137,77 @@ function DataTable({
         />
       )}
     </section>
+  )
+}
+
+function SearchableSelect({
+  name,
+  label,
+  options,
+  defaultValue = '',
+  placeholder,
+  allowEmpty = false,
+}: {
+  name: string
+  label: string
+  options: SelectOption[]
+  defaultValue?: string
+  placeholder: string
+  allowEmpty?: boolean
+}) {
+  const [selectedValue, setSelectedValue] = useState(defaultValue)
+  const [search, setSearch] = useState('')
+  const selectedOption = options.find((option) => option.value === selectedValue)
+  const normalizedSearch = normalizeSearch(search)
+  const visibleOptions = options
+    .filter(
+      (option) =>
+        normalizedSearch.length === 0 ||
+        normalizeSearch(`${option.label} ${option.description ?? ''}`).includes(normalizedSearch),
+    )
+    .slice(0, 30)
+
+  function selectOption(option: SelectOption | null) {
+    setSelectedValue(option?.value ?? '')
+    setSearch(option?.label ?? '')
+  }
+
+  return (
+    <label className="searchable-select-field">
+      {label}
+      <input type="hidden" name={name} value={selectedValue} />
+      <div className="searchable-select">
+        <input
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value)
+            if (selectedValue) {
+              setSelectedValue('')
+            }
+          }}
+          placeholder={selectedOption?.label ?? placeholder}
+        />
+        <div className="searchable-select-list">
+          {allowEmpty && (
+            <button type="button" onClick={() => selectOption(null)}>
+              <strong>{placeholder}</strong>
+            </button>
+          )}
+          {visibleOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={option.value === selectedValue ? 'selected' : ''}
+              onClick={() => selectOption(option)}
+            >
+              <strong>{option.label}</strong>
+              {option.description && <span>{option.description}</span>}
+            </button>
+          ))}
+          {visibleOptions.length === 0 && <span className="searchable-select-empty">Nenhum registro encontrado</span>}
+        </div>
+      </div>
+    </label>
   )
 }
 
