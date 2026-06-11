@@ -2230,6 +2230,45 @@ function PayrollEntriesView({
       (productionFilters.status === 'todos' || entry.status === productionFilters.status)
     )
   })
+  const productionSummaryEntries = productionEntries.filter((entry) =>
+    productionFilters.payrollPeriodId === 'todos' ? true : entry.payrollPeriodId === productionFilters.payrollPeriodId,
+  )
+  const productionSummary = {
+    draft: productionSummaryEntries.filter((entry) => entry.status === 'Draft').length,
+    approved: productionSummaryEntries.filter((entry) => entry.status === 'Approved').length,
+    integrated: productionSummaryEntries.filter((entry) => entry.status === 'IntegratedIntoPayroll').length,
+    canceled: productionSummaryEntries.filter((entry) => entry.status === 'Canceled').length,
+    quantity: productionSummaryEntries
+      .filter((entry) => entry.status !== 'Canceled')
+      .reduce((total, entry) => total + entry.quantity, 0),
+    amount: productionSummaryEntries
+      .filter((entry) => entry.status !== 'Canceled')
+      .reduce((total, entry) => total + entry.totalAmount, 0),
+  }
+  const productionByEmployee = Array.from(
+    productionSummaryEntries
+      .filter((entry) => entry.status !== 'Canceled')
+      .reduce((map, entry) => {
+        const current = map.get(entry.employeeId) ?? {
+          employee: `${entry.employeeRegistration} - ${entry.employeeName}`,
+          quantity: 0,
+          amount: 0,
+          approved: 0,
+          draft: 0,
+          integrated: 0,
+        }
+
+        current.quantity += entry.quantity
+        current.amount += entry.totalAmount
+        if (entry.status === 'Approved') current.approved += 1
+        if (entry.status === 'Draft') current.draft += 1
+        if (entry.status === 'IntegratedIntoPayroll') current.integrated += 1
+        map.set(entry.employeeId, current)
+
+        return map
+      }, new Map<string, { employee: string; quantity: number; amount: number; approved: number; draft: number; integrated: number }>())
+      .values(),
+  ).sort((first, second) => first.employee.localeCompare(second.employee))
 
   function toggleFilteredEmployees() {
     const shouldSelect = !allFilteredSelected
@@ -2949,6 +2988,20 @@ function PayrollEntriesView({
 
       {mode === 'production' && (
         <>
+          <section className="metrics-grid">
+            <Metric label="Rascunhos" value={productionSummary.draft} />
+            <Metric label="Aprovados" value={productionSummary.approved} />
+            <Metric label="Integrados" value={productionSummary.integrated} />
+            <Metric label="Quantidade" value={formatNumber(productionSummary.quantity)} />
+            <Metric label="Valor producao" value={formatCurrency(productionSummary.amount)} />
+          </section>
+
+          {productionSummary.draft > 0 && (
+            <div className="alert alert-warning">
+              Existem apontamentos em rascunho. Aprove ou cancele esses registros antes de calcular a folha da competencia.
+            </div>
+          )}
+
           <section className="panel">
             <h3>Pesquisar apontamentos de producao</h3>
             <form className="employee-filter-form">
@@ -3032,6 +3085,20 @@ function PayrollEntriesView({
               </label>
             </form>
           </section>
+
+          <DataTable
+            title="Conferencia por colaborador"
+            columns={['Colaborador', 'Quantidade', 'Total', 'Aprovados', 'Rascunhos', 'Integrados']}
+            pageSize={10}
+            rows={productionByEmployee.map((item) => [
+              item.employee,
+              formatNumber(item.quantity),
+              formatCurrency(item.amount),
+              String(item.approved),
+              String(item.draft),
+              String(item.integrated),
+            ])}
+          />
 
           <DataTable
             title="Apontamentos de producao"

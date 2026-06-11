@@ -527,7 +527,8 @@ th {
   color: #1f6c4d;
 }
 
-.feedback-warning {
+.feedback-warning,
+.alert-warning {
   background: #fff4d6;
   color: #8a4b00;
 }

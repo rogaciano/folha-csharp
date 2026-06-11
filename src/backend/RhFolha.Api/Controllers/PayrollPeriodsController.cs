@@ -154,6 +154,17 @@ public sealed class PayrollPeriodsController(RhFolhaDbContext dbContext, AuditSe
             return BadRequest(new { message = "Rubrica de salario mensal codigo 001 nao encontrada ou inativa." });
         }
 
+        var productionRubric = await dbContext.Rubrics
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                rubric => rubric.CompanyId == period.CompanyId && rubric.Code == "002" && rubric.IsActive,
+                cancellationToken);
+
+        if (productionRubric is null)
+        {
+            return BadRequest(new { message = "Rubrica de producao codigo 002 nao encontrada ou inativa." });
+        }
+
         var fgtsRubric = await dbContext.Rubrics
             .AsNoTracking()
             .FirstOrDefaultAsync(
@@ -313,12 +324,42 @@ public sealed class PayrollPeriodsController(RhFolhaDbContext dbContext, AuditSe
                 (!entry.EndsOn.HasValue || entry.EndsOn.Value >= period.StartsOn))
             .ToListAsync(cancellationToken);
 
+        var hasDraftProductionEntries = await dbContext.EmployeeProductionEntries.AnyAsync(
+            entry =>
+                entry.CompanyId == period.CompanyId &&
+                entry.PayrollPeriodId == period.Id &&
+                entry.DeletedAt == null &&
+                entry.Status == "Draft",
+            cancellationToken);
+
+        if (hasDraftProductionEntries)
+        {
+            return BadRequest(new { message = "Existem apontamentos de producao em rascunho nesta competencia. Aprove ou cancele antes de calcular a folha." });
+        }
+
         var previousCurrentCalculations = await dbContext.PayrollCalculations
             .Where(calculation =>
                 calculation.CompanyId == period.CompanyId &&
                 calculation.PayrollPeriodId == period.Id &&
                 calculation.IsCurrent)
             .ToListAsync(cancellationToken);
+        var previousCurrentCalculationIds = previousCurrentCalculations.Select(calculation => calculation.Id).ToHashSet();
+
+        var productionEntries = await dbContext.EmployeeProductionEntries
+            .Where(entry =>
+                entry.CompanyId == period.CompanyId &&
+                entry.PayrollPeriodId == period.Id &&
+                entry.DeletedAt == null &&
+                (entry.Status == "Approved" ||
+                    (entry.Status == "IntegratedIntoPayroll" &&
+                        entry.IntegratedPayrollCalculationId.HasValue &&
+                        previousCurrentCalculationIds.Contains(entry.IntegratedPayrollCalculationId.Value))))
+            .ToListAsync(cancellationToken);
+
+        foreach (var productionEntry in productionEntries.Where(entry => entry.Status == "IntegratedIntoPayroll"))
+        {
+            productionEntry.ReopenIntegration();
+        }
 
         foreach (var calculation in previousCurrentCalculations)
         {
@@ -364,6 +405,41 @@ public sealed class PayrollPeriodsController(RhFolhaDbContext dbContext, AuditSe
                 entry.Origin,
                 entry.Amount,
                 entry.Quantity));
+        }
+
+        foreach (var productionGroup in productionEntries.GroupBy(entry => entry.EmployeeId))
+        {
+            if (!employeesById.TryGetValue(productionGroup.Key, out var employee))
+            {
+                continue;
+            }
+
+            var quantity = productionGroup.Sum(entry => entry.Quantity);
+            var amount = productionGroup.Sum(entry => entry.TotalAmount);
+            if (amount <= 0)
+            {
+                continue;
+            }
+
+            var productionItem = new PayrollCalculationItem(
+                newCalculation.Id,
+                employee.Id,
+                employee.Registration,
+                employee.Name,
+                productionRubric.Id,
+                productionRubric.Code,
+                productionRubric.Name,
+                productionRubric.Type,
+                "producao",
+                amount,
+                quantity);
+
+            items.Add(productionItem);
+
+            foreach (var productionEntry in productionGroup)
+            {
+                productionEntry.MarkIntegrated(newCalculation.Id, productionItem.Id);
+            }
         }
 
         foreach (var fixedEntry in fixedEntries)

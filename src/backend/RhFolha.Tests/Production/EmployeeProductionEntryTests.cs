@@ -60,6 +60,30 @@ public sealed class EmployeeProductionEntryTests
     }
 
     [Fact]
+    public void ReopenIntegration_ShouldReturnIntegratedEntryToApproved()
+    {
+        var entry = CreateEntry(quantity: 1m, unitValue: 10m);
+        entry.Approve(Guid.NewGuid());
+        entry.MarkIntegrated(Guid.NewGuid(), Guid.NewGuid());
+
+        entry.ReopenIntegration();
+
+        entry.Status.Should().Be("Approved");
+        entry.IntegratedPayrollCalculationId.Should().BeNull();
+        entry.IntegratedPayrollCalculationItemId.Should().BeNull();
+    }
+
+    [Fact]
+    public void ReopenIntegration_ShouldRejectEntryNotIntegrated()
+    {
+        var entry = CreateEntry(quantity: 1m, unitValue: 10m);
+
+        var action = entry.ReopenIntegration;
+
+        action.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
     public void ApplyRate_ShouldSetRateSourceAndRecalculateTotal()
     {
         var entry = CreateEntry(quantity: 8m, unitValue: 1m);

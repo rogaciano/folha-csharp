@@ -221,4 +221,17 @@ public sealed class EmployeeProductionEntry : Entity
         Status = "IntegratedIntoPayroll";
         UpdatedAt = DateTime.UtcNow;
     }
+
+    public void ReopenIntegration()
+    {
+        if (Status != "IntegratedIntoPayroll")
+        {
+            throw new InvalidOperationException("Somente producao integrada pode ser reaberta para novo calculo.");
+        }
+
+        IntegratedPayrollCalculationId = null;
+        IntegratedPayrollCalculationItemId = null;
+        Status = "Approved";
+        UpdatedAt = DateTime.UtcNow;
+    }
 }
