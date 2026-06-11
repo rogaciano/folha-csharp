@@ -849,6 +849,25 @@ th {
   gap: 10px;
 }
 
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid #d8dee6;
+  padding-bottom: 12px;
+}
+
+.settings-tabs button {
+  min-height: 36px;
+  background: #e8eef7;
+  color: #2f527c;
+}
+
+.settings-tabs button.active {
+  background: #256f5c;
+  color: #ffffff;
+}
+
 .employee-toolbar {
   display: flex;
   align-items: center;

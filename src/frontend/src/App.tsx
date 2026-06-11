@@ -4896,6 +4896,9 @@ function SettingsView({
   const [dapicConferenceTab, setDapicConferenceTab] = useState<DapicConferenceTab>('employees')
   const [dapicConferenceSearch, setDapicConferenceSearch] = useState('')
   const [dapicConferenceStatus, setDapicConferenceStatus] = useState('all')
+  const [settingsTab, setSettingsTab] = useState<
+    'company' | 'dapic' | 'dapicConference' | 'statutory' | 'production' | 'users'
+  >('company')
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     await Promise.resolve(onSubmit(event))
@@ -4929,15 +4932,48 @@ function SettingsView({
 
   return (
     <>
-      <section className="section-actions">
-        <button type="button" onClick={() => setIsUserModalOpen(true)}>
-          Novo usuario
+      <section className="settings-tabs">
+        <button type="button" className={settingsTab === 'company' ? 'active' : ''} onClick={() => setSettingsTab('company')}>
+          Empresa
         </button>
-        <button type="button" onClick={() => setIsCreateModalOpen(true)}>
-          Nova tabela legal
+        <button type="button" className={settingsTab === 'dapic' ? 'active' : ''} onClick={() => setSettingsTab('dapic')}>
+          Integracao Dapic
+        </button>
+        <button
+          type="button"
+          className={settingsTab === 'dapicConference' ? 'active' : ''}
+          onClick={() => setSettingsTab('dapicConference')}
+        >
+          Conferencia Dapic
+        </button>
+        <button type="button" className={settingsTab === 'statutory' ? 'active' : ''} onClick={() => setSettingsTab('statutory')}>
+          Tabelas Legais
+        </button>
+        <button type="button" className={settingsTab === 'production' ? 'active' : ''} onClick={() => setSettingsTab('production')}>
+          Producao
+        </button>
+        <button type="button" className={settingsTab === 'users' ? 'active' : ''} onClick={() => setSettingsTab('users')}>
+          Usuarios e Auditoria
         </button>
       </section>
 
+      {settingsTab === 'users' && (
+        <section className="section-actions">
+          <button type="button" onClick={() => setIsUserModalOpen(true)}>
+            Novo usuario
+          </button>
+        </section>
+      )}
+
+      {settingsTab === 'statutory' && (
+        <section className="section-actions">
+          <button type="button" onClick={() => setIsCreateModalOpen(true)}>
+            Nova tabela legal
+          </button>
+        </section>
+      )}
+
+      {settingsTab === 'company' && (
       <Panel title="Empresa">
         <div className="company-list">
           {companies.map((company) => (
@@ -4948,7 +4984,10 @@ function SettingsView({
           ))}
         </div>
       </Panel>
+      )}
 
+      {settingsTab === 'dapic' && (
+      <>
       <Panel title="Integracao Dapic" className="dapic-integration-panel">
         {dapicBusyMessage && (
           <div className="integration-progress" role="status" aria-live="polite">
@@ -5064,6 +5103,26 @@ function SettingsView({
         </div>
       </Panel>
 
+      <DataTable
+        title="Ultimas sincronizacoes Dapic"
+        columns={['Inicio', 'Recurso', 'Status', 'Paginas', 'Lidos', 'Criados', 'Atualizados', 'Erro']}
+        pageSize={10}
+        rows={dapicLogs.map((log) => [
+          formatDateTime(log.startedAt),
+          labelDapicResource(log.resource),
+          labelDapicStatus(log.status),
+          String(log.pageCount),
+          String(log.recordsRead),
+          String(log.recordsCreated),
+          String(log.recordsUpdated),
+          log.errorMessage ?? '-',
+        ])}
+      />
+      </>
+      )}
+
+      {settingsTab === 'dapicConference' && (
+      <>
       <section className="metrics-grid">
         <Metric label="Dapic funcionarios" value={dapicEmployees.length} />
         <Metric label="Dapic produtos" value={dapicProducts.length} />
@@ -5092,23 +5151,8 @@ function SettingsView({
         onEmployeeReset={onDapicEmployeeReset}
         onEmployeeCreateAndLink={onDapicEmployeeCreateAndLink}
       />
-
-      <DataTable
-        title="Ultimas sincronizacoes Dapic"
-        columns={['Inicio', 'Recurso', 'Status', 'Paginas', 'Lidos', 'Criados', 'Atualizados', 'Erro']}
-        pageSize={10}
-        rows={dapicLogs.map((log) => [
-          formatDateTime(log.startedAt),
-          labelDapicResource(log.resource),
-          labelDapicStatus(log.status),
-          String(log.pageCount),
-          String(log.recordsRead),
-          String(log.recordsCreated),
-          String(log.recordsUpdated),
-          log.errorMessage ?? '-',
-        ])}
-      />
-
+      </>
+      )}
       {isCreateModalOpen && (
         <Modal title="Nova tabela legal" onClose={() => setIsCreateModalOpen(false)} size="wide">
           <form className="statutory-table-form" onSubmit={(event) => void handleSubmit(event)}>
@@ -5262,91 +5306,99 @@ function SettingsView({
         </Modal>
       )}
 
-      <DataTable
-        title="Usuarios e permissoes"
-        columns={['Nome', 'E-mail', 'Empresa', 'Perfil', 'Status', 'Ultimo login', 'Acoes']}
-        pageSize={10}
-        rows={users.map((user) => [
-          user.fullName,
-          user.email,
-          companies.find((company) => company.id === user.companyId)?.tradeName ??
-            companies.find((company) => company.id === user.companyId)?.legalName ??
-            'Todas',
-          labelUserRole(user.role),
-          activeBadge(user.isActive),
-          user.lastLoginAt ? formatDateTime(user.lastLoginAt) : '-',
-          (
-            <div className="table-actions">
-              {actionButton('Editar', () => setEditingUser(user))}
-              {actionButton('Senha', () => setResetPasswordUser(user))}
-              {actionButton(
-                user.isActive ? 'Inativar' : 'Reativar',
-                () => onUserToggleStatus(user),
-                user.id === currentUser.id,
-              )}
-            </div>
-          ),
-        ])}
-      />
+      {settingsTab === 'users' && (
+        <>
+          <DataTable
+            title="Usuarios e permissoes"
+            columns={['Nome', 'E-mail', 'Empresa', 'Perfil', 'Status', 'Ultimo login', 'Acoes']}
+            pageSize={10}
+            rows={users.map((user) => [
+              user.fullName,
+              user.email,
+              companies.find((company) => company.id === user.companyId)?.tradeName ??
+                companies.find((company) => company.id === user.companyId)?.legalName ??
+                'Todas',
+              labelUserRole(user.role),
+              activeBadge(user.isActive),
+              user.lastLoginAt ? formatDateTime(user.lastLoginAt) : '-',
+              (
+                <div className="table-actions">
+                  {actionButton('Editar', () => setEditingUser(user))}
+                  {actionButton('Senha', () => setResetPasswordUser(user))}
+                  {actionButton(
+                    user.isActive ? 'Inativar' : 'Reativar',
+                    () => onUserToggleStatus(user),
+                    user.id === currentUser.id,
+                  )}
+                </div>
+              ),
+            ])}
+          />
 
-      <DataTable
-        title="Auditoria recente"
-        columns={['Data', 'Usuario', 'Perfil', 'Acao', 'Entidade', 'Descricao', 'IP']}
-        pageSize={10}
-        rows={auditLogs.map((log) => [
-          formatDateTime(log.createdAt),
-          `${log.userName} (${log.userEmail})`,
-          labelUserRole(log.userRole),
-          labelAuditAction(log.action),
-          log.entityId ? `${log.entityName} ${log.entityId.slice(0, 8)}` : log.entityName,
-          log.description,
-          log.ipAddress ?? '-',
-        ])}
-      />
+          <DataTable
+            title="Auditoria recente"
+            columns={['Data', 'Usuario', 'Perfil', 'Acao', 'Entidade', 'Descricao', 'IP']}
+            pageSize={10}
+            rows={auditLogs.map((log) => [
+              formatDateTime(log.createdAt),
+              `${log.userName} (${log.userEmail})`,
+              labelUserRole(log.userRole),
+              labelAuditAction(log.action),
+              log.entityId ? `${log.entityName} ${log.entityId.slice(0, 8)}` : log.entityName,
+              log.description,
+              log.ipAddress ?? '-',
+            ])}
+          />
+        </>
+      )}
 
-      <DataTable
-        title="Tabelas de valores de producao"
-        action={
-          <button type="button" onClick={() => setIsProductionRateModalOpen(true)}>
-            Nova tabela de producao
-          </button>
-        }
-        columns={['Nome', 'Vigencia', 'Status', 'Regras', 'Acoes']}
-        pageSize={10}
-        rows={productionRateTables.map((table) => [
-          table.name,
-          `${formatDate(table.effectiveFrom)} ate ${table.effectiveTo ? formatDate(table.effectiveTo) : 'vigente'}`,
-          productionRateStatusBadge(table.status),
-          formatProductionRateRules(table.rates),
-          (
-            <div className="table-actions">
-              {actionButton('Detalhes', () => setViewingProductionRateTable(table))}
-              {actionButton('Editar', () => setEditingProductionRateTable(table), table.status !== 'Draft')}
-              {actionButton('Nova vigencia', () => setDuplicatingProductionRateTable(table))}
-              {actionButton(table.status === 'Active' ? 'Inativar' : 'Ativar', () => onProductionRateTableToggleStatus(table))}
-            </div>
-          ),
-        ])}
-      />
+      {settingsTab === 'production' && (
+        <DataTable
+          title="Tabelas de valores de producao"
+          action={
+            <button type="button" onClick={() => setIsProductionRateModalOpen(true)}>
+              Nova tabela de producao
+            </button>
+          }
+          columns={['Nome', 'Vigencia', 'Status', 'Regras', 'Acoes']}
+          pageSize={10}
+          rows={productionRateTables.map((table) => [
+            table.name,
+            `${formatDate(table.effectiveFrom)} ate ${table.effectiveTo ? formatDate(table.effectiveTo) : 'vigente'}`,
+            productionRateStatusBadge(table.status),
+            formatProductionRateRules(table.rates),
+            (
+              <div className="table-actions">
+                {actionButton('Detalhes', () => setViewingProductionRateTable(table))}
+                {actionButton('Editar', () => setEditingProductionRateTable(table), table.status !== 'Draft')}
+                {actionButton('Nova vigencia', () => setDuplicatingProductionRateTable(table))}
+                {actionButton(table.status === 'Active' ? 'Inativar' : 'Ativar', () => onProductionRateTableToggleStatus(table))}
+              </div>
+            ),
+          ])}
+        />
+      )}
 
-      <DataTable
-        title="Tabelas legais parametrizadas"
-        columns={['Tipo', 'Nome', 'Vigencia', 'Faixas', 'Status', 'Acoes']}
-        pageSize={10}
-        rows={statutoryTables.map((table) => [
-          labelStatutoryTableType(table.type),
-          table.name,
-          `${formatDate(table.startsOn)} ate ${table.endsOn ? formatDate(table.endsOn) : 'vigente'}`,
-          formatStatutoryRanges(table.ranges),
-          activeBadge(table.isActive),
-          (
-            <div className="table-actions">
-              {actionButton('Nova vigencia', () => onDuplicate(table))}
-              {actionButton(table.isActive ? 'Inativar' : 'Reativar', () => onToggleStatus(table))}
-            </div>
-          ),
-        ])}
-      />
+      {settingsTab === 'statutory' && (
+        <DataTable
+          title="Tabelas legais parametrizadas"
+          columns={['Tipo', 'Nome', 'Vigencia', 'Faixas', 'Status', 'Acoes']}
+          pageSize={10}
+          rows={statutoryTables.map((table) => [
+            labelStatutoryTableType(table.type),
+            table.name,
+            `${formatDate(table.startsOn)} ate ${table.endsOn ? formatDate(table.endsOn) : 'vigente'}`,
+            formatStatutoryRanges(table.ranges),
+            activeBadge(table.isActive),
+            (
+              <div className="table-actions">
+                {actionButton('Nova vigencia', () => onDuplicate(table))}
+                {actionButton(table.isActive ? 'Inativar' : 'Reativar', () => onToggleStatus(table))}
+              </div>
+            ),
+          ])}
+        />
+      )}
     </>
   )
 }
