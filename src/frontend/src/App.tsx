@@ -82,6 +82,7 @@ type View =
   | 'rubrics'
   | 'periods'
   | 'entries'
+  | 'production'
   | 'conference'
   | 'reports'
   | 'settings'
@@ -1742,6 +1743,9 @@ function App() {
           <NavButton active={view === 'entries'} onClick={() => setView('entries')}>
             Lancamentos
           </NavButton>
+          <NavButton active={view === 'production'} onClick={() => setView('production')}>
+            Producao
+          </NavButton>
           <NavButton active={view === 'reports'} onClick={() => setView('reports')}>
             Relatorios
           </NavButton>
@@ -1864,6 +1868,32 @@ function App() {
 
         {view === 'entries' && (
           <PayrollEntriesView
+            mode="payroll"
+            canEdit={canOperateHr(session.user.role)}
+            activeCompany={activeCompany}
+            employees={employees}
+            rubrics={rubrics}
+            payrollPeriods={payrollPeriods}
+            payrollEntries={payrollEntries}
+            fixedPayrollEntries={fixedPayrollEntries}
+            productionEntries={productionEntries}
+            productionCatalogs={productionCatalogs}
+            onSubmit={handlePayrollEntrySubmit}
+            onMassSubmit={handleMassPayrollEntrySubmit}
+            onProductionSubmit={handleProductionEntrySubmit}
+            onProductionUpdate={handleProductionEntryUpdate}
+            onProductionApprove={handleApproveProductionEntry}
+            onProductionCancel={handleCancelProductionEntry}
+            onFixedSubmit={handleFixedPayrollEntrySubmit}
+            onFixedUpdate={handleFixedPayrollEntryUpdate}
+            onFixedClose={handleFixedPayrollEntryClose}
+            onFixedToggle={handleFixedPayrollEntryToggleStatus}
+          />
+        )}
+
+        {view === 'production' && (
+          <PayrollEntriesView
+            mode="production"
             canEdit={canOperateHr(session.user.role)}
             activeCompany={activeCompany}
             employees={employees}
@@ -2049,6 +2079,9 @@ function Dashboard({
             <button type="button" onClick={() => onNavigate('entries')}>
               Fazer lancamento
             </button>
+            <button type="button" onClick={() => onNavigate('production')}>
+              Apontar producao
+            </button>
           </div>
         </Panel>
       </section>
@@ -2082,6 +2115,7 @@ function Dashboard({
 }
 
 function PayrollEntriesView({
+  mode,
   canEdit,
   activeCompany,
   employees,
@@ -2102,6 +2136,7 @@ function PayrollEntriesView({
   onFixedClose,
   onFixedToggle,
 }: {
+  mode: 'payroll' | 'production'
   canEdit: boolean
   activeCompany: Company | undefined
   employees: Employee[]
@@ -2268,18 +2303,24 @@ function PayrollEntriesView({
     <>
       {canEdit && (
         <section className="section-actions">
-          <button type="button" onClick={() => setEntryModal('manual')}>
-            Novo lancamento avulso
-          </button>
-          <button type="button" onClick={() => setEntryModal('mass')}>
-            Lancamento em massa
-          </button>
-          <button type="button" onClick={() => setEntryModal('production')}>
-            Apontamento de producao
-          </button>
-          <button type="button" onClick={() => setEntryModal('fixed')}>
-            Lancamento fixo
-          </button>
+          {mode === 'payroll' && (
+            <>
+              <button type="button" onClick={() => setEntryModal('manual')}>
+                Novo lancamento avulso
+              </button>
+              <button type="button" onClick={() => setEntryModal('mass')}>
+                Lancamento em massa
+              </button>
+              <button type="button" onClick={() => setEntryModal('fixed')}>
+                Lancamento fixo
+              </button>
+            </>
+          )}
+          {mode === 'production' && (
+            <button type="button" onClick={() => setEntryModal('production')}>
+              Novo apontamento de producao
+            </button>
+          )}
         </section>
       )}
 
@@ -2871,147 +2912,155 @@ function PayrollEntriesView({
         </Modal>
       )}
 
-      <DataTable
-        title="Lancamentos fixos"
-        columns={canEdit ? ['Colaborador', 'Rubrica', 'Tipo', 'Valor', 'Quantidade', 'Vigencia', 'Status', 'Acoes'] : ['Colaborador', 'Rubrica', 'Tipo', 'Valor', 'Quantidade', 'Vigencia', 'Status']}
-        rows={fixedPayrollEntries.map((entry) => [
-          `${entry.employeeRegistration} - ${entry.employeeName}`,
-          `${entry.rubricCode} - ${entry.rubricName}`,
-          labelRubricType(entry.rubricType),
-          formatCurrency(entry.amount),
-          entry.quantity ? formatNumber(entry.quantity) : '-',
-          `${formatDate(entry.startsOn)} a ${entry.endsOn ? formatDate(entry.endsOn) : 'sem fim'}`,
-          activeBadge(entry.isActive),
-          ...(canEdit ? [fixedPayrollEntryActions(entry, setEditingFixedEntry, setClosingFixedEntry, onFixedToggle)] : []),
-        ])}
-      />
+      {mode === 'payroll' && (
+        <>
+          <DataTable
+            title="Lancamentos fixos"
+            columns={canEdit ? ['Colaborador', 'Rubrica', 'Tipo', 'Valor', 'Quantidade', 'Vigencia', 'Status', 'Acoes'] : ['Colaborador', 'Rubrica', 'Tipo', 'Valor', 'Quantidade', 'Vigencia', 'Status']}
+            rows={fixedPayrollEntries.map((entry) => [
+              `${entry.employeeRegistration} - ${entry.employeeName}`,
+              `${entry.rubricCode} - ${entry.rubricName}`,
+              labelRubricType(entry.rubricType),
+              formatCurrency(entry.amount),
+              entry.quantity ? formatNumber(entry.quantity) : '-',
+              `${formatDate(entry.startsOn)} a ${entry.endsOn ? formatDate(entry.endsOn) : 'sem fim'}`,
+              activeBadge(entry.isActive),
+              ...(canEdit ? [fixedPayrollEntryActions(entry, setEditingFixedEntry, setClosingFixedEntry, onFixedToggle)] : []),
+            ])}
+          />
 
-      <section className="panel">
-        <h3>Pesquisar apontamentos de producao</h3>
-        <form className="employee-filter-form">
-          <label>
-            Pesquisar
-            <input
-              value={productionFilters.search}
-              onChange={(event) => setProductionFilters((current) => ({ ...current, search: event.target.value }))}
-              placeholder="Colaborador, produto, operacao, ordem..."
-            />
-          </label>
-          <label>
-            Competencia
-            <select
-              value={productionFilters.payrollPeriodId}
-              onChange={(event) => setProductionFilters((current) => ({ ...current, payrollPeriodId: event.target.value }))}
-            >
-              <option value="todos">Todas</option>
-              {payrollPeriods.map((period) => (
-                <option key={period.id} value={period.id}>
-                  {period.code}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Produto
-            <select
-              value={productionFilters.productId}
-              onChange={(event) => setProductionFilters((current) => ({ ...current, productId: event.target.value }))}
-            >
-              <option value="todos">Todos</option>
-              {productionCatalogs.products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.reference}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Operacao
-            <select
-              value={productionFilters.operationId}
-              onChange={(event) => setProductionFilters((current) => ({ ...current, operationId: event.target.value }))}
-            >
-              <option value="todos">Todas</option>
-              {productionCatalogs.operations.map((operation) => (
-                <option key={operation.id} value={operation.id}>
-                  {operation.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Celula
-            <select
-              value={productionFilters.cellId}
-              onChange={(event) => setProductionFilters((current) => ({ ...current, cellId: event.target.value }))}
-            >
-              <option value="todos">Todas</option>
-              <option value="sem-celula">Sem celula</option>
-              {productionCatalogs.cells.map((cell) => (
-                <option key={cell.id} value={cell.id}>
-                  {cell.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Status
-            <select
-              value={productionFilters.status}
-              onChange={(event) => setProductionFilters((current) => ({ ...current, status: event.target.value }))}
-            >
-              <option value="todos">Todos</option>
-              <option value="Draft">Rascunho</option>
-              <option value="Approved">Aprovado</option>
-              <option value="IntegratedIntoPayroll">Integrado</option>
-              <option value="Canceled">Cancelado</option>
-            </select>
-          </label>
-        </form>
-      </section>
+          <DataTable
+            title="Lancamentos avulsos"
+            columns={['Competencia', 'Colaborador', 'Rubrica', 'Tipo', 'Origem', 'Valor', 'Quantidade', 'Data', 'Status']}
+            rows={payrollEntries.map((entry) => [
+              entry.payrollPeriodCode,
+              `${entry.employeeRegistration} - ${entry.employeeName}`,
+              `${entry.rubricCode} - ${entry.rubricName}`,
+              labelRubricType(entry.rubricType),
+              labelEntryOrigin(entry.origin),
+              formatCurrency(entry.amount),
+              entry.quantity ? formatNumber(entry.quantity) : '-',
+              formatDate(entry.entryDate),
+              entryStatusBadge(entry.status),
+            ])}
+          />
+        </>
+      )}
 
-      <DataTable
-        title="Apontamentos de producao"
-        columns={canEdit ? ['Competencia', 'Colaborador', 'Produto', 'Operacao', 'Celula', 'Quantidade', 'Valor unitario', 'Total', 'Data', 'Status', 'Acoes'] : ['Competencia', 'Colaborador', 'Produto', 'Operacao', 'Celula', 'Quantidade', 'Valor unitario', 'Total', 'Data', 'Status']}
-        pageSize={15}
-        rows={filteredProductionEntries.map((entry) => [
-          entry.payrollPeriodCode,
-          `${entry.employeeRegistration} - ${entry.employeeName}`,
-          `${entry.productReference} - ${entry.productDescription}`,
-          entry.operationName,
-          entry.cellName ?? '-',
-          formatNumber(entry.quantity),
-          formatCurrency(entry.unitValue),
-          formatCurrency(entry.totalAmount),
-          formatDate(entry.productionDate),
-          productionEntryStatusBadge(entry.status),
-          ...(canEdit
-            ? [
-                <div className="table-actions">
-                  {actionButton('Editar', () => setEditingProductionEntry(entry), entry.status !== 'Draft')}
-                  {actionButton('Aprovar', () => onProductionApprove(entry), entry.status !== 'Draft')}
-                  {actionButton('Cancelar', () => onProductionCancel(entry), entry.status === 'IntegratedIntoPayroll' || entry.status === 'Canceled')}
-                </div>,
-              ]
-            : []),
-        ])}
-      />
+      {mode === 'production' && (
+        <>
+          <section className="panel">
+            <h3>Pesquisar apontamentos de producao</h3>
+            <form className="employee-filter-form">
+              <label>
+                Pesquisar
+                <input
+                  value={productionFilters.search}
+                  onChange={(event) => setProductionFilters((current) => ({ ...current, search: event.target.value }))}
+                  placeholder="Colaborador, produto, operacao, ordem..."
+                />
+              </label>
+              <label>
+                Competencia
+                <select
+                  value={productionFilters.payrollPeriodId}
+                  onChange={(event) => setProductionFilters((current) => ({ ...current, payrollPeriodId: event.target.value }))}
+                >
+                  <option value="todos">Todas</option>
+                  {payrollPeriods.map((period) => (
+                    <option key={period.id} value={period.id}>
+                      {period.code}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Produto
+                <select
+                  value={productionFilters.productId}
+                  onChange={(event) => setProductionFilters((current) => ({ ...current, productId: event.target.value }))}
+                >
+                  <option value="todos">Todos</option>
+                  {productionCatalogs.products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.reference}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Operacao
+                <select
+                  value={productionFilters.operationId}
+                  onChange={(event) => setProductionFilters((current) => ({ ...current, operationId: event.target.value }))}
+                >
+                  <option value="todos">Todas</option>
+                  {productionCatalogs.operations.map((operation) => (
+                    <option key={operation.id} value={operation.id}>
+                      {operation.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Celula
+                <select
+                  value={productionFilters.cellId}
+                  onChange={(event) => setProductionFilters((current) => ({ ...current, cellId: event.target.value }))}
+                >
+                  <option value="todos">Todas</option>
+                  <option value="sem-celula">Sem celula</option>
+                  {productionCatalogs.cells.map((cell) => (
+                    <option key={cell.id} value={cell.id}>
+                      {cell.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Status
+                <select
+                  value={productionFilters.status}
+                  onChange={(event) => setProductionFilters((current) => ({ ...current, status: event.target.value }))}
+                >
+                  <option value="todos">Todos</option>
+                  <option value="Draft">Rascunho</option>
+                  <option value="Approved">Aprovado</option>
+                  <option value="IntegratedIntoPayroll">Integrado</option>
+                  <option value="Canceled">Cancelado</option>
+                </select>
+              </label>
+            </form>
+          </section>
 
-      <DataTable
-        title="Lancamentos avulsos"
-        columns={['Competencia', 'Colaborador', 'Rubrica', 'Tipo', 'Origem', 'Valor', 'Quantidade', 'Data', 'Status']}
-        rows={payrollEntries.map((entry) => [
-          entry.payrollPeriodCode,
-          `${entry.employeeRegistration} - ${entry.employeeName}`,
-          `${entry.rubricCode} - ${entry.rubricName}`,
-          labelRubricType(entry.rubricType),
-          labelEntryOrigin(entry.origin),
-          formatCurrency(entry.amount),
-          entry.quantity ? formatNumber(entry.quantity) : '-',
-          formatDate(entry.entryDate),
-          entryStatusBadge(entry.status),
-        ])}
-      />
+          <DataTable
+            title="Apontamentos de producao"
+            columns={canEdit ? ['Competencia', 'Colaborador', 'Produto', 'Operacao', 'Celula', 'Quantidade', 'Valor unitario', 'Total', 'Data', 'Status', 'Acoes'] : ['Competencia', 'Colaborador', 'Produto', 'Operacao', 'Celula', 'Quantidade', 'Valor unitario', 'Total', 'Data', 'Status']}
+            pageSize={15}
+            rows={filteredProductionEntries.map((entry) => [
+              entry.payrollPeriodCode,
+              `${entry.employeeRegistration} - ${entry.employeeName}`,
+              `${entry.productReference} - ${entry.productDescription}`,
+              entry.operationName,
+              entry.cellName ?? '-',
+              formatNumber(entry.quantity),
+              formatCurrency(entry.unitValue),
+              formatCurrency(entry.totalAmount),
+              formatDate(entry.productionDate),
+              productionEntryStatusBadge(entry.status),
+              ...(canEdit
+                ? [
+                    <div className="table-actions">
+                      {actionButton('Editar', () => setEditingProductionEntry(entry), entry.status !== 'Draft')}
+                      {actionButton('Aprovar', () => onProductionApprove(entry), entry.status !== 'Draft')}
+                      {actionButton('Cancelar', () => onProductionCancel(entry), entry.status === 'IntegratedIntoPayroll' || entry.status === 'Canceled')}
+                    </div>,
+                  ]
+                : []),
+            ])}
+          />
+        </>
+      )}
     </>
   )
 }
@@ -6881,6 +6930,7 @@ function pageTitle(view: View) {
     rubrics: 'Rubricas',
     periods: 'Competencias',
     entries: 'Lancamentos',
+    production: 'Producao',
     conference: 'Conferencia',
     reports: 'Relatorios',
     settings: 'Configuracoes',
